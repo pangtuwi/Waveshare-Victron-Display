@@ -43,6 +43,7 @@ text:
   - platform: template
     name: "Display Message"
     id: display_msg
+    mode: text
     optimistic: true
     on_value:
       then:
@@ -60,6 +61,7 @@ number:
     max_value: 100
     step: 10
     initial_value: 100
+    optimistic: true
     on_value:
       then:
         - uart.write:
@@ -78,6 +80,7 @@ select:
       - "Weather"
       - "Custom"
     initial_option: "Clock"
+    optimistic: true
     on_value:
       then:
         - uart.write:
