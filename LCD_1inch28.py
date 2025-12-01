@@ -404,10 +404,10 @@ class LCD_1inch28(framebuf.FrameBuffer):
 class Touch_CST816T(object):
     #Initialize the touch chip  初始化触摸芯片
     def __init__(self,address=0x15,mode=0,i2c_num=1,i2c_sda=6,i2c_scl=7,int_pin=21,rst_pin=22,LCD=None):
-        self._bus = I2C(id=i2c_num,scl=Pin(i2c_scl),sda=Pin(i2c_sda),freq=400_000) #Initialize I2C 初始化I2C
+        self._bus = I2C(i2c_num, scl=Pin(i2c_scl), sda=Pin(i2c_sda), freq=400_000) #Initialize I2C 初始化I2C
         self._address = address #Set slave address  设置从机地址
-        self.int=Pin(int_pin,Pin.IN, Pin.PULL_UP)     
-        self.tim = Timer()     
+        self.int=Pin(int_pin,Pin.IN, Pin.PULL_UP)
+        self.tim = Timer(-1)
         self.rst=Pin(rst_pin,Pin.OUT)
         self.Reset()
         bRet=self.WhoAmI()
@@ -473,12 +473,12 @@ class Touch_CST816T(object):
     #Get the coordinates of the touch  获取触摸的坐标
     def get_point(self):
         xy_point = self._read_block(0x03,4)
-        
-        x_point= ((xy_point[0]&0x0f)<<8)+xy_point[1]
-        y_point= ((xy_point[2]&0x0f)<<8)+xy_point[3]
-        
-        self.X_point=x_point
-        self.Y_point=y_point
+
+        x_point = int(((xy_point[0]&0x0f)<<8)+xy_point[1])
+        y_point = int(((xy_point[2]&0x0f)<<8)+xy_point[3])
+
+        self.X_point = x_point
+        self.Y_point = y_point
         
     def Int_Callback(self,pin):
         if self.Mode == 0 :
@@ -496,12 +496,12 @@ class Touch_CST816T(object):
 class QMI8658(object):
     def __init__(self,address=0X6B):
         self._address = address
-        self._bus = I2C(id=1,scl=Pin(I2C_SDL),sda=Pin(I2C_SDA),freq=100_000)
+        self._bus = I2C(1, scl=Pin(I2C_SDL), sda=Pin(I2C_SDA), freq=100_000)
         bRet=self.WhoAmI()
         if bRet :
             self.Read_Revision()
         else    :
-            return NULL
+            return None
         self.Config_apply()
 
     def _read_byte(self,cmd):
@@ -555,7 +555,7 @@ class QMI8658(object):
                 xyz[i] = xyz[i]-65535
         return xyz
     def Read_XYZ(self):
-        xyz=[0,0,0,0,0,0]
+        xyz=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         raw_xyz=self.Read_Raw_XYZ()  
         #QMI8658AccRange_8g
         acc_lsb_div=(1<<12)
@@ -577,10 +577,10 @@ def Touch_HandWriting():
     Touch.Set_Mode(Touch.Mode)
     
     LCD.fill(LCD.white)
-    LCD.rect(0, 0, 35, 208,LCD.red,True)
-    LCD.rect(0, 0, 208, 35,LCD.green,True)
-    LCD.rect(205, 0, 240, 240,LCD.blue,True)
-    LCD.rect(0, 205, 240, 240,LCD.brown,True)
+    LCD.fill_rect(0, 0, 35, 208, LCD.red)
+    LCD.fill_rect(0, 0, 208, 35, LCD.green)
+    LCD.fill_rect(205, 0, 35, 240, LCD.blue)
+    LCD.fill_rect(0, 205, 240, 35, LCD.brown)
     LCD.show()
     
     Touch.tim.init(period=1, callback=Touch.Timer_callback)
@@ -606,10 +606,10 @@ def Touch_HandWriting():
                         
                     if (Touch.X_point > 0 and Touch.X_point < 240) and (Touch.Y_point > 208 and Touch.Y_point < 240):
                         LCD.fill(LCD.white)
-                        LCD.rect(0, 0, 35, 208,LCD.red,True)
-                        LCD.rect(0, 0, 208, 35,LCD.green,True)
-                        LCD.rect(205, 0, 240, 240,LCD.blue,True)
-                        LCD.rect(0, 205, 240, 240,LCD.brown,True)
+                        LCD.fill_rect(0, 0, 35, 208, LCD.red)
+                        LCD.fill_rect(0, 0, 208, 35, LCD.green)
+                        LCD.fill_rect(205, 0, 35, 240, LCD.blue)
+                        LCD.fill_rect(0, 205, 240, 35, LCD.brown)
                         LCD.show()
                     Touch.Flgh = 4
                     

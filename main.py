@@ -68,7 +68,8 @@ def process_command(cmd_line):
             # Set text color (RGB)
             colors = cmd_line[6:].decode().strip().split(',')
             r, g, b = int(colors[0]), int(colors[1]), int(colors[2])
-            display_color = lcd.color(r, g, b)
+            # Convert RGB888 to RGB565 format (note: uses BRG format due to framebuf)
+            display_color = ((b & 0xF8) << 8) | ((g & 0xFC) << 3) | (r >> 3)
             print(f"Color set to RGB({r},{g},{b})")
             
     except Exception as e:
