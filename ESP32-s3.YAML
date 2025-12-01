@@ -4,15 +4,20 @@ esphome:
   on_boot:
     priority: -100
     then:
-      - delay: 2s
+      - delay: 10s
       - lambda: |-
           auto time_now = id(homeassistant_time).now();
-          char time_str[60];
-          snprintf(time_str, sizeof(time_str), "SETTIME:%d,%d,%d,%d,%d,%d,%d,%d\n",
-                   time_now.year, time_now.month, time_now.day_of_month,
-                   time_now.hour, time_now.minute, time_now.second,
-                   time_now.day_of_week, time_now.day_of_year);
-          id(uart_bus).write_str(time_str);
+          if (time_now.is_valid()) {
+            char time_str[60];
+            snprintf(time_str, sizeof(time_str), "SETTIME:%d,%d,%d,%d,%d,%d,%d,%d\n",
+                     time_now.year, time_now.month, time_now.day_of_month,
+                     time_now.hour, time_now.minute, time_now.second,
+                     time_now.day_of_week, time_now.day_of_year);
+            id(uart_bus).write_str(time_str);
+            ESP_LOGI("main", "Sent time to RP2350: %s", time_str);
+          } else {
+            ESP_LOGW("main", "Time not yet synchronized, will retry on hourly sync");
+          }
 
 esp32:
   board: esp32-s3-devkitc-1
