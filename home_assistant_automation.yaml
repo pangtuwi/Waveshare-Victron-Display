@@ -13,22 +13,22 @@ automation:
     action:
       - service: esphome.esphome_web_b11440_send_weather
         data:
-          condition: "{{ states('weather.home') }}"
-          temperature: "{{ state_attr('weather.home', 'temperature') }}°C"
-          humidity: "{{ state_attr('weather.home', 'humidity') }}%"
+          condition: "{{ states('weather.forecast_home') | title }}"
+          temperature: "{{ state_attr('weather.forecast_home', 'temperature') | round(1) }}°C"
+          humidity: "{{ state_attr('weather.forecast_home', 'humidity') | round(0) }}%"
 
 # Alternative: Update when weather changes
   - alias: "Update RP2350 Display Weather on Change"
     description: "Send weather data when it changes"
     trigger:
       - platform: state
-        entity_id: weather.home
+        entity_id: weather.forecast_home
     action:
       - service: esphome.esphome_web_b11440_send_weather
         data:
-          condition: "{{ states('weather.home') }}"
-          temperature: "{{ state_attr('weather.home', 'temperature') }}°C"
-          humidity: "{{ state_attr('weather.home', 'humidity') }}%"
+          condition: "{{ states('weather.forecast_home') | title }}"
+          temperature: "{{ state_attr('weather.forecast_home', 'temperature') | round(1) }}°C"
+          humidity: "{{ state_attr('weather.forecast_home', 'humidity') | round(0) }}%"
 
 # Manual service call example (for testing):
 # service: esphome.esphome_web_b11440_send_weather
