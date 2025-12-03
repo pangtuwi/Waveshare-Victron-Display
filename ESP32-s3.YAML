@@ -4,7 +4,7 @@ esphome:
   on_boot:
     priority: -100
     then:
-      - delay: 10s
+      - delay: 20s
       - lambda: |-
           auto time_now = id(homeassistant_time).now();
           if (time_now.is_valid()) {
@@ -16,7 +16,20 @@ esphome:
             id(uart_bus).write_str(time_str);
             ESP_LOGI("main", "Sent time to RP2350: %s", time_str);
           } else {
-            ESP_LOGW("main", "Time not yet synchronized, will retry on hourly sync");
+            ESP_LOGW("main", "Time not yet synchronized, will retry on next minute");
+          }
+      # Retry after 1 minute if time wasn't valid on first attempt
+      - delay: 60s
+      - lambda: |-
+          auto time_now = id(homeassistant_time).now();
+          if (time_now.is_valid()) {
+            char time_str[60];
+            snprintf(time_str, sizeof(time_str), "SETTIME:%d,%d,%d,%d,%d,%d,%d,%d\n",
+                     time_now.year, time_now.month, time_now.day_of_month,
+                     time_now.hour, time_now.minute, time_now.second,
+                     time_now.day_of_week, time_now.day_of_year);
+            id(uart_bus).write_str(time_str);
+            ESP_LOGI("main", "Sent time to RP2350 (retry): %s", time_str);
           }
 
 esp32:
@@ -50,6 +63,28 @@ api:
             id: uart_bus
             data: !lambda |-
               std::string msg = "WEATHER:" + condition + "," + temperature + "," + humidity + "\n";
+              return std::vector<uint8_t>(msg.begin(), msg.end());
+    - service: send_hive
+      variables:
+        current_temp: string
+        target_temp: string
+        heating_status: string
+        hotwater_status: string
+      then:
+        - uart.write:
+            id: uart_bus
+            data: !lambda |-
+              std::string msg = "HIVE:" + current_temp + "," + target_temp + "," + heating_status + "," + hotwater_status + "\n";
+              return std::vector<uint8_t>(msg.begin(), msg.end());
+    - service: send_bedroom
+      variables:
+        temperature: string
+        humidity: string
+      then:
+        - uart.write:
+            id: uart_bus
+            data: !lambda |-
+              std::string msg = "BEDROOM:" + temperature + "," + humidity + "\n";
               return std::vector<uint8_t>(msg.begin(), msg.end());
 
 ota:
@@ -122,9 +157,9 @@ select:
     name: "Display Mode"
     options:
       - "Clock"
-      - "Sensors"
+      - "Bedroom"
       - "Weather"
-      - "Custom"
+      - "Cycle"
     initial_option: "Clock"
     optimistic: true
     on_value:

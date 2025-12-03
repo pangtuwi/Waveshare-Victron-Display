@@ -14,7 +14,7 @@ automation:
       - service: esphome.esphome_web_b11440_send_weather
         data:
           condition: "{{ states('weather.forecast_home') | title }}"
-          temperature: "{{ state_attr('weather.forecast_home', 'temperature') | round(1) }}°C"
+          temperature: "{{ state_attr('weather.forecast_home', 'temperature') | round(1) }} C"
           humidity: "{{ state_attr('weather.forecast_home', 'humidity') | round(0) }}%"
 
 # Alternative: Update when weather changes
@@ -27,7 +27,7 @@ automation:
       - service: esphome.esphome_web_b11440_send_weather
         data:
           condition: "{{ states('weather.forecast_home') | title }}"
-          temperature: "{{ state_attr('weather.forecast_home', 'temperature') | round(1) }}°C"
+          temperature: "{{ state_attr('weather.forecast_home', 'temperature') | round(0) }}°C"
           humidity: "{{ state_attr('weather.forecast_home', 'humidity') | round(0) }}%"
 
 # Manual service call example (for testing):
@@ -36,3 +36,77 @@ automation:
 #   condition: "Sunny"
 #   temperature: "24°C"
 #   humidity: "45%"
+
+# Hive Thermostat Automation Examples
+# Replace entity IDs with your actual Hive entities
+
+  - alias: "Update RP2350 Display Hive Data"
+    description: "Send Hive thermostat data to RP2350 display every 2 minutes"
+    trigger:
+      - platform: time_pattern
+        minutes: "/2"  # Update every 2 minutes
+    action:
+      - service: esphome.esphome_web_b11440_send_hive
+        data:
+          current_temp: "{{ state_attr('climate.hive_thermostat', 'current_temperature') | round(1) }} C"
+          target_temp: "{{ state_attr('climate.hive_thermostat', 'temperature') | round(1) }} C"
+          heating_status: "{{ 'ON' if is_state('climate.hive_thermostat', 'heat') else 'OFF' }}"
+          hotwater_status: "{{ 'ON' if is_state('water_heater.hive_hot_water', 'on') else 'OFF' }}"
+
+# Alternative: Update when Hive state changes
+  - alias: "Update RP2350 Display Hive on Change"
+    description: "Send Hive data when thermostat or hot water changes"
+    trigger:
+      - platform: state
+        entity_id:
+          - climate.hive_thermostat
+          - water_heater.hive_hot_water
+    action:
+      - service: esphome.esphome_web_b11440_send_hive
+        data:
+          current_temp: "{{ state_attr('climate.hive_thermostat', 'current_temperature') | round(1) }} C"
+          target_temp: "{{ state_attr('climate.hive_thermostat', 'temperature') | round(1) }} C"
+          heating_status: "{{ 'ON' if is_state('climate.hive_thermostat', 'heat') else 'OFF' }}"
+          hotwater_status: "{{ 'ON' if is_state('water_heater.hive_hot_water', 'on') else 'OFF' }}"
+
+# Manual service call example (for testing):
+# service: esphome.esphome_web_b11440_send_hive
+# data:
+#   current_temp: "20.5 C"
+#   target_temp: "21.0 C"
+#   heating_status: "ON"
+#   hotwater_status: "OFF"
+
+# Bedroom Temperature Sensor Automation
+# Replace entity IDs with your actual bedroom temperature sensor
+
+  - alias: "Update RP2350 Display Bedroom Data"
+    description: "Send bedroom temperature data to RP2350 display every 2 minutes"
+    trigger:
+      - platform: time_pattern
+        minutes: "/2"  # Update every 2 minutes
+    action:
+      - service: esphome.esphome_web_b11440_send_bedroom
+        data:
+          temperature: "{{ states('sensor.esphome_web_b10c2c_bedroom_temperature') | round(1) }} C"
+          humidity: "{{ states('sensor.esphome_web_b10c2c_bedroom_humidity') | round(0) }}%"
+
+# Alternative: Update when bedroom sensor changes
+  - alias: "Update RP2350 Display Bedroom on Change"
+    description: "Send bedroom data when temperature sensor changes"
+    trigger:
+      - platform: state
+        entity_id:
+          - sensor.temp_sensor_1_bedroom_temperature
+          - sensor.temp_sensor_1_bedroom_humidity
+    action:
+      - service: esphome.esphome_web_b11440_send_bedroom
+        data:
+          temperature: "{{ states('sensor.esphome_web_b10c2c_bedroom_temperature') | round(1) }} C"
+          humidity: "{{ states('sensor.esphome_web_b10c2c_bedroom_humidity') | round(0) }}%"
+
+# Manual service call example (for testing):
+# service: esphome.esphome_web_b11440_send_bedroom
+# data:
+#   temperature: "22.5 C"
+#   humidity: "55%"
