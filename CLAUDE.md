@@ -20,6 +20,7 @@ A MicroPython project for the Waveshare RP2350-Touch-LCD-1.28 display that integ
 - `LCD_1inch28.py` - Hardware driver library (LCD, Touch, IMU) - renamed from RP2350-TOUCH-LCD-1.28.py
 - `bitmap_fonts.py` - 16x24 pixel bitmap font for digits and colon
 - `bitmap_fonts_32.py` - 24x32 pixel bitmap font for larger displays
+- `bitmap_fonts_48.py` - 32x48 pixel bitmap font for extra large displays
 - `ESP32-s3.YAML` - ESPHome configuration for ESP32-S3 WiFi/UART bridge
 - `home_assistant_automation.yaml` - Example Home Assistant automations
 - `BITMAP_FONTS_README.md` - Guide for creating custom bitmap fonts
@@ -43,7 +44,7 @@ Commands are line-delimited ASCII strings sent from ESP32 to RP2350:
 
 **Configuration Commands**:
 - `BRIGHT:<0-100>` - Set brightness percentage (0-100)
-- `MODE:<mode_name>` - Set display mode (Clock/Sensors/Weather/Cycle)
+- `MODE:<mode_name>` - Set display mode (Clock/Bedroom/Weather/Cycle)
 - `COLOR:<r>,<g>,<b>` - Set text color (RGB values 0-255)
 - `SETTIME:<YYYY>,<MM>,<DD>,<HH>,<MM>,<SS>,<WEEKDAY>,<YEARDAY>` - Set RTC time
 
@@ -74,7 +75,7 @@ Commands are line-delimited ASCII strings sent from ESP32 to RP2350:
 - **Weather**:
   - Black background with white text
   - Weather condition at top
-  - Very large temperature using 24x32 bitmap font
+  - Very large temperature using 32x48 bitmap font
   - Humidity display using 16x24 bitmap font
   - No decimal places on temperature
 
@@ -92,7 +93,8 @@ Commands are line-delimited ASCII strings sent from ESP32 to RP2350:
 Custom bitmap fonts for crisp, large number displays:
 - **bitmap_fonts.py**: 16x24 pixel font (digits 0-9, colon)
 - **bitmap_fonts_32.py**: 24x32 pixel font (digits 0-9, colon)
-- Functions: `draw_char()`, `draw_text()`, `get_text_width()`
+- **bitmap_fonts_48.py**: 32x48 pixel font (digits 0-9, colon)
+- Functions: `draw_char()`, `draw_text()`, `get_text_width()` (and _32, _48 variants)
 - See BITMAP_FONTS_README.md for creating custom fonts
 
 ### Driver Library (LCD_1inch28.py)
@@ -154,6 +156,7 @@ mpremote cp main.py :main.py
 mpremote cp LCD_1inch28.py :LCD_1inch28.py
 mpremote cp bitmap_fonts.py :bitmap_fonts.py
 mpremote cp bitmap_fonts_32.py :bitmap_fonts_32.py
+mpremote cp bitmap_fonts_48.py :bitmap_fonts_48.py
 ```
 
 ### Running the Application
@@ -201,6 +204,7 @@ The driver uses BRG format (not RGB) due to MicroPython framebuf:
 - `lcd.write_text(str, x, y, size, color)` - Scalable font (size multiplier)
 - `bitmap_fonts.draw_text(lcd, text, x, y, color, spacing)` - 16x24 bitmap font
 - `bitmap_fonts_32.draw_text_32(lcd, text, x, y, color, spacing)` - 24x32 bitmap font
+- `bitmap_fonts_48.draw_text_48(lcd, text, x, y, color, spacing)` - 32x48 bitmap font
 - Bitmap fonts provide crisp, professional-looking large numbers
 
 ### RTC (Real-Time Clock)
