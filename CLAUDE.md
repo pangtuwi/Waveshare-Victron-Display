@@ -18,9 +18,11 @@ A MicroPython project for the Waveshare RP2350-Touch-LCD-1.28 display that integ
 
 - `main.py` - Main application code for Home Assistant integration
 - `LCD_1inch28.py` - Hardware driver library (LCD, Touch, IMU) - renamed from RP2350-TOUCH-LCD-1.28.py
+- `circular_gauge.py` - Circular gauge/progress display module with segmented arcs
 - `bitmap_fonts.py` - 16x24 pixel bitmap font for digits and colon
 - `bitmap_fonts_32.py` - 24x32 pixel bitmap font for larger displays
 - `bitmap_fonts_48.py` - 32x48 pixel bitmap font for extra large displays
+- `screentest.py` - Comprehensive test suite for display features and CircularGauge
 - `ESP32-s3.YAML` - ESPHome configuration for ESP32-S3 WiFi/UART bridge
 - `home_assistant_automation.yaml` - Example Home Assistant automations
 - `BITMAP_FONTS_README.md` - Guide for creating custom bitmap fonts
@@ -97,6 +99,97 @@ Custom bitmap fonts for crisp, large number displays:
 - Functions: `draw_char()`, `draw_text()`, `get_text_width()` (and _32, _48 variants)
 - See BITMAP_FONTS_README.md for creating custom fonts
 
+### Circular Gauge Module (circular_gauge.py)
+
+**CircularGauge class** - Progressive fill circular gauge/progress indicator:
+- Displays values as segmented arcs around the display perimeter
+- Configurable parameters:
+  - **Segments**: 4-20 segments (validated and clamped)
+  - **Angles**: Start/end angles in degrees (supports wraparound >360°)
+  - **Thickness**: Arc thickness in pixels
+  - **Gap**: Gap between segments in degrees
+  - **Colors**: Foreground (filled) and background (unfilled) segments
+  - **Direction**: Counter-clockwise (default) or clockwise drawing
+
+**Angle System**:
+- 0° = Right (3 o'clock)
+- 90° = Top (12 o'clock)
+- 180° = Left (9 o'clock)
+- 270° = Bottom (6 o'clock)
+- Counter-clockwise increases angle (default)
+- Clockwise decreases angle (set `clockwise=True`)
+
+**Example - Top arc gauge**:
+```python
+from circular_gauge import CircularGauge
+
+gauge = CircularGauge(
+    lcd=lcd,
+    center_x=120, center_y=120,
+    radius=110, thickness=12,
+    segments=16,
+    start_angle=135,  # Top-left
+    end_angle=405,    # Top-right (270° arc)
+    gap_degrees=2,
+    color=0xFFFF,     # White
+    background_color=0x2104  # Dark grey for unfilled
+)
+gauge.update(75)  # Set to 75% and draw
+lcd.show()
+```
+
+**Example - Bottom arc (speedometer style)**:
+```python
+gauge = CircularGauge(
+    lcd=lcd,
+    center_x=120, center_y=150,
+    radius=100, thickness=15,
+    segments=12,
+    start_angle=225,  # Bottom-left
+    end_angle=495,    # Bottom-right (270° arc)
+    gap_degrees=2,
+    color=rgb_to_brg565(0, 255, 0)  # Green
+)
+```
+
+**Example - Clockwise gauge**:
+```python
+gauge = CircularGauge(
+    lcd=lcd,
+    center_x=120, center_y=120,
+    radius=110, thickness=12,
+    segments=8,
+    start_angle=45,   # Top-right
+    end_angle=315,    # Bottom-right (90° clockwise)
+    gap_degrees=2,
+    color=0xFFFF,
+    clockwise=True    # Draw clockwise instead of counter-clockwise
+)
+```
+
+**Methods**:
+- `set_value(percentage)` - Set gauge value (0-100)
+- `draw()` - Draw gauge to LCD buffer
+- `update(percentage)` - Set value and draw in one call
+- `draw_with_partial_refresh()` - Draw and use Windows_show() for efficiency
+- `draw_incremental(old_value)` - Only redraw changed segments
+
+**Helper function**:
+- `rgb_to_brg565(r, g, b)` - Convert RGB888 to BRG565 format for correct color display
+
+**Performance**:
+- Single segment (~10px thick, 20° arc): ~5-10ms
+- Full 12-segment gauge: ~60-120ms
+- Suitable for real-time sensor data updates (1-2 second intervals)
+
+**Use Cases**:
+- Temperature gauges
+- Humidity indicators
+- Battery level displays
+- Progress indicators
+- Speed/RPM displays
+- Any percentage-based visualization
+
 ### Driver Library (LCD_1inch28.py)
 
 **LCD_1inch28 class**:
@@ -154,9 +247,16 @@ Use `mpremote` to copy all required files:
 ```bash
 mpremote cp main.py :main.py
 mpremote cp LCD_1inch28.py :LCD_1inch28.py
+mpremote cp circular_gauge.py :circular_gauge.py
 mpremote cp bitmap_fonts.py :bitmap_fonts.py
 mpremote cp bitmap_fonts_32.py :bitmap_fonts_32.py
 mpremote cp bitmap_fonts_48.py :bitmap_fonts_48.py
+```
+
+For testing the CircularGauge module:
+```bash
+mpremote cp screentest.py :screentest.py
+mpremote run screentest.py
 ```
 
 ### Running the Application

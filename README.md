@@ -49,9 +49,11 @@ A MicroPython project for the Waveshare RP2350-Touch-LCD-1.28 display that integ
 .
 ├── main.py                      # Main application with HA integration
 ├── LCD_1inch28.py               # Hardware driver library
+├── circular_gauge.py            # Circular gauge/progress display module
 ├── bitmap_fonts.py              # 16x24 pixel bitmap font
 ├── bitmap_fonts_32.py           # 24x32 pixel bitmap font
 ├── bitmap_fonts_48.py           # 32x48 pixel bitmap font
+├── screentest.py                # Test suite for display and CircularGauge
 ├── ESP32-s3.YAML                # ESPHome configuration for ESP32
 ├── home_assistant_automation.yaml # HA automation examples
 ├── BITMAP_FONTS_README.md       # Guide for custom bitmap fonts
@@ -76,12 +78,19 @@ Using `mpremote`:
 ```bash
 mpremote cp main.py :main.py
 mpremote cp LCD_1inch28.py :LCD_1inch28.py
+mpremote cp circular_gauge.py :circular_gauge.py
 mpremote cp bitmap_fonts.py :bitmap_fonts.py
 mpremote cp bitmap_fonts_32.py :bitmap_fonts_32.py
 mpremote cp bitmap_fonts_48.py :bitmap_fonts_48.py
 ```
 
 The code will auto-run on power-up since it's named `main.py`.
+
+**Optional - Upload test suite:**
+```bash
+mpremote cp screentest.py :screentest.py
+mpremote run screentest.py
+```
 
 ### 3. Configure ESP32-S3 with ESPHome
 
@@ -260,6 +269,109 @@ time_x = (240 - time_width) // 2  # Center on screen
 bitmap_fonts.draw_text(lcd, time_str, time_x, 100, lcd.white, spacing=4)
 ```
 
+## Circular Gauge Module
+
+The `circular_gauge.py` module provides a flexible `CircularGauge` class for creating segmented arc displays perfect for visualizing percentage values (0-100%).
+
+### Features
+
+- **Configurable segments**: 4-20 segments
+- **Flexible angles**: Position arcs anywhere on the display (top, bottom, sides, full circle)
+- **Adjustable appearance**: Thickness, gaps, colors
+- **Direction control**: Counter-clockwise (default) or clockwise drawing
+- **Performance optimized**: Pre-calculated angles, efficient drawing
+- **Background support**: Show unfilled segments in different color
+
+### Angle System
+
+```
+        90° (Top)
+           |
+180° ------+------ 0° (Right)
+(Left)     |
+        270° (Bottom)
+```
+
+- Counter-clockwise increases angle (default)
+- Clockwise decreases angle (set `clockwise=True`)
+- Angles can exceed 360° for wraparound arcs
+
+### Example Usage
+
+**Top arc gauge (default):**
+```python
+from circular_gauge import CircularGauge, rgb_to_brg565
+
+gauge = CircularGauge(
+    lcd=lcd,
+    center_x=120, center_y=120,
+    radius=110, thickness=12,
+    segments=16,
+    start_angle=135,  # Top-left
+    end_angle=405,    # Top-right (270° arc)
+    gap_degrees=2,
+    color=0xFFFF,     # White
+    background_color=rgb_to_brg565(64, 64, 64)  # Dark grey
+)
+gauge.update(75)  # Set to 75% and draw
+lcd.show()
+```
+
+**Bottom arc (speedometer style):**
+```python
+gauge = CircularGauge(
+    lcd=lcd,
+    center_x=120, center_y=150,
+    radius=100, thickness=15,
+    segments=12,
+    start_angle=225,  # Bottom-left
+    end_angle=495,    # Bottom-right (270° arc)
+    gap_degrees=2,
+    color=rgb_to_brg565(0, 255, 0)  # Green
+)
+```
+
+**Clockwise gauge:**
+```python
+gauge = CircularGauge(
+    lcd=lcd,
+    center_x=120, center_y=120,
+    radius=110, thickness=12,
+    segments=8,
+    start_angle=45,   # Top-right
+    end_angle=315,    # Bottom-right (90° clockwise)
+    gap_degrees=2,
+    color=0xFFFF,
+    clockwise=True    # Draw clockwise
+)
+```
+
+### Methods
+
+- `set_value(percentage)` - Set value (0-100)
+- `draw()` - Draw gauge to buffer
+- `update(percentage)` - Set and draw in one call
+- `draw_with_partial_refresh()` - Efficient partial update
+- `draw_incremental(old_value)` - Only redraw changed segments
+
+### Use Cases
+
+- Temperature gauges
+- Humidity indicators
+- Battery level displays
+- Progress indicators
+- Speed/RPM displays
+- Any percentage-based visualization
+
+### Testing
+
+Run the comprehensive test suite:
+```bash
+mpremote run screentest.py
+```
+
+Tests include: segment counts, angles, colors, thickness, clockwise/counter-clockwise, and performance benchmarks.
+
 ## Driver Library
 
 The `LCD_1inch28.py` library provides:
@@ -288,14 +400,16 @@ The `LCD_1inch28.py` library provides:
 1. Time synchronization from Home Assistant (RTC)
 2. Touch-based mode cycling with debouncing
 3. Custom bitmap fonts for large, crisp number displays (16x24, 24x32, 32x48)
-4. Weather data display with auto-updates
-5. Bedroom temperature sensor display with dark grey background
-6. Auto-cycling Cycle mode (10-second intervals)
-7. Mode button displays current mode name
-8. Multiple background colors (black, dark grey)
-9. Large temperature displays for easy reading
-10. ESPHome integration with services
-11. Home Assistant automation examples
+4. **Circular gauge module** for segmented arc displays (gauges, progress indicators)
+5. Weather data display with auto-updates
+6. Bedroom temperature sensor display with dark grey background
+7. Auto-cycling Cycle mode (10-second intervals)
+8. Mode button displays current mode name
+9. Multiple background colors (black, dark grey)
+10. Large temperature displays for easy reading
+11. ESPHome integration with services
+12. Home Assistant automation examples
+13. Comprehensive test suite (screentest.py)
 
 ## Configuration Examples
 
