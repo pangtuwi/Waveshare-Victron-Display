@@ -4,6 +4,9 @@ A MicroPython project for the Waveshare RP2350-Touch-LCD-1.28 display that integ
 
 ![Waveshare RP2350-Touch-LCD-1.28](https://www.waveshare.com/img/devkit/RP2350-Touch-LCD-1.28/RP2350-Touch-LCD-1.28-1.jpg)
 
+<img width="764" height="1074" alt="image" src="https://github.com/user-attachments/assets/d431f108-7de2-4b7a-8400-566ccb79599a" />
+
+
 ## Hardware
 
 **Waveshare RP2350-Touch-LCD-1.28**
