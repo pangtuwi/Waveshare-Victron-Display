@@ -26,7 +26,8 @@ A MicroPython project for the Waveshare RP2350-Touch-LCD-1.28 display that integ
 - **Clock**: Large bitmap font time display with date and AM/PM indicator
 - **Bedroom**: Bedroom temperature sensor data with large temperature and humidity display
 - **Weather**: Weather condition, large temperature display, and humidity
-- **Cycle**: Auto-rotates through Clock → Weather → Bedroom every 10 seconds
+- **Battery**: Circular gauge display showing battery State of Charge (SOC) 0-100% with background image
+- **Cycle**: Auto-rotates through Clock → Weather → Bedroom → Battery every 10 seconds
 
 ### Interaction
 - **Touch Control**: Touch button at bottom cycles through modes
@@ -51,18 +52,25 @@ A MicroPython project for the Waveshare RP2350-Touch-LCD-1.28 display that integ
 ```
 .
 ├── main.py                      # Main application with HA integration
+├── old_main.py                  # Backup before battery monitor integration
 ├── LCD_1inch28.py               # Hardware driver library
 ├── circular_gauge.py            # Circular gauge/progress display module
+├── battery_monitor.py           # Battery SOC display with circular gauge
+├── image_display.py             # Image display utilities with overlays
+├── image_data.py                # Storage for converted images
 ├── bitmap_fonts.py              # 16x24 pixel bitmap font
 ├── bitmap_fonts_32.py           # 24x32 pixel bitmap font
 ├── bitmap_fonts_48.py           # 32x48 pixel bitmap font
 ├── screentest.py                # Test suite for display and CircularGauge
+├── jtj.py                       # Standalone battery SOC display
 ├── ESP32-s3.YAML                # ESPHome configuration for ESP32
 ├── home_assistant_automation.yaml # HA automation examples
 ├── BITMAP_FONTS_README.md       # Guide for custom bitmap fonts
+├── COLOR_NOTES.md               # Color system documentation
+├── DISPLAY_INTEGRATION.md       # Battery monitor integration guide
 ├── WAVESHARE_RP2350B.uf2        # MicroPython firmware
-├── CLAUDE.md                     # Development documentation
-└── README.md                     # This file
+├── CLAUDE.md                    # Development documentation
+└── README.md                    # This file
 ```
 
 ## Quick Start
@@ -82,6 +90,9 @@ Using `mpremote`:
 mpremote cp main.py :main.py
 mpremote cp LCD_1inch28.py :LCD_1inch28.py
 mpremote cp circular_gauge.py :circular_gauge.py
+mpremote cp battery_monitor.py :battery_monitor.py
+mpremote cp image_display.py :image_display.py
+mpremote cp image_data.py :image_data.py
 mpremote cp bitmap_fonts.py :bitmap_fonts.py
 mpremote cp bitmap_fonts_32.py :bitmap_fonts_32.py
 mpremote cp bitmap_fonts_48.py :bitmap_fonts_48.py
@@ -139,6 +150,7 @@ Commands are line-delimited ASCII strings sent from ESP32 to RP2350:
 
 - `WEATHER:<condition>,<temperature>,<humidity>` - Update weather data
 - `BEDROOM:<temperature>,<humidity>` - Update bedroom temperature sensor data
+- `BATTERY:<soc>` - Update battery State of Charge (0-100%)
 - `HIVE:<current_temp>,<target_temp>,<heating_status>,<hotwater_status>` - Update Hive data (legacy)
 
 ### Sensor Responses (RP2350 to ESP32)
@@ -167,8 +179,16 @@ Commands are line-delimited ASCII strings sent from ESP32 to RP2350:
 - Very large temperature (32x48 bitmap font, no decimals)
 - Humidity display (16x24 bitmap font)
 
+### Battery Mode
+- Circular gauge display with background image
+- Shows battery State of Charge (SOC) 0-100%
+- Arc from 215° to 320° (clockwise, bottom arc)
+- 20 segments with white fill on magenta background
+- Updates via `BATTERY:<soc>` UART command
+- Based on jtj.py standalone display design
+
 ### Cycle Mode
-- Auto-cycles through Clock → Weather → Bedroom
+- Auto-cycles through Clock → Weather → Bedroom → Battery
 - Changes display every 10 seconds
 - Uses same layouts as individual modes
 
@@ -241,6 +261,8 @@ uart.write(b'BRIGHT:50\n')
 uart.write(b'MODE:Weather\n')
 uart.write(b'WEATHER:Sunny,22 C,45%\n')
 uart.write(b'BEDROOM:22.5 C,55%\n')
+uart.write(b'BATTERY:75\n')  # Set battery SOC to 75%
+uart.write(b'MODE:Battery\n')  # Switch to Battery mode
 ```
 
 ## Bitmap Fonts
@@ -406,13 +428,16 @@ The `LCD_1inch28.py` library provides:
 4. **Circular gauge module** for segmented arc displays (gauges, progress indicators)
 5. Weather data display with auto-updates
 6. Bedroom temperature sensor display with dark grey background
-7. Auto-cycling Cycle mode (10-second intervals)
-8. Mode button displays current mode name
-9. Multiple background colors (black, dark grey)
-10. Large temperature displays for easy reading
-11. ESPHome integration with services
-12. Home Assistant automation examples
-13. Comprehensive test suite (screentest.py)
+7. **Battery monitor mode** with circular gauge and background image
+8. Auto-cycling Cycle mode (10-second intervals, includes Battery)
+9. Mode button displays current mode name
+10. Multiple background colors (black, dark grey)
+11. Large temperature displays for easy reading
+12. Image display system with gamma correction
+13. ESPHome integration with services
+14. Home Assistant automation examples
+15. Comprehensive test suite (screentest.py)
+16. Standalone battery SOC display (jtj.py)
 
 ## Configuration Examples
 

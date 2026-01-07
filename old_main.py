@@ -5,7 +5,6 @@ import json
 import bitmap_fonts
 import bitmap_fonts_32
 import bitmap_fonts_48
-from battery_monitor import BatteryMonitor
 
 # Initialize UART
 uart = UART(0, baudrate=115200, tx=Pin(16), rx=Pin(17))
@@ -20,12 +19,6 @@ lcd.set_bl_pwm(65535)  # Set brightness to maximum
 # Initialize touch controller
 touch = Touch_CST816T(mode=1, LCD=lcd)  # Mode 1 = point mode
 
-# Initialize battery monitor
-print("Initializing battery monitor...")
-battery_monitor = BatteryMonitor(lcd, image_index=0)
-battery_monitor.render()  # Show initial state (0%)
-print("Battery monitor ready")
-
 # Display welcome message
 lcd.fill(lcd.white)
 lcd.text("Home Assistant", 60, 100, lcd.black)
@@ -39,11 +32,11 @@ time.sleep(2)
 
 # Display settings
 current_brightness = 100
-current_mode = "Battery"  # TEMPORARY: Only Battery mode enabled
+current_mode = "Clock"
 display_color = lcd.black
 
 # Custom mode cycling
-custom_sub_modes = ["Clock", "Weather", "Bedroom", "Battery"]
+custom_sub_modes = ["Clock", "Weather", "Bedroom"]
 current_custom_index = 0
 
 # Weather data
@@ -65,7 +58,7 @@ def process_command(cmd_line):
     """Process incoming commands from Home Assistant via ESP32"""
     global current_brightness, current_mode, display_color, weather_condition, weather_temp, weather_humidity
     global hive_current_temp, hive_target_temp, hive_heating_status, hive_hotwater_status
-    global bedroom_temp, bedroom_humidity, battery_monitor
+    global bedroom_temp, bedroom_humidity
 
     try:
         print(f"Received command: {cmd_line}")
@@ -182,19 +175,6 @@ def process_command(cmd_line):
                 if current_mode == "Bedroom":
                     update_display_for_mode(current_mode)
 
-        elif cmd_line.startswith(b'BATTERY:'):
-            # Update battery SOC
-            # Format: BATTERY:soc
-            soc_str = cmd_line[8:].decode().strip()
-            try:
-                soc = int(soc_str)
-                if battery_monitor.update_soc(soc):
-                    print(f"Battery SOC: {soc}%")
-                else:
-                    print(f"Battery SOC update failed: {soc}")
-            except ValueError:
-                print(f"Invalid battery SOC format: {soc_str}")
-
     except Exception as e:
         print(f"Error processing command: {e}")
 
@@ -211,9 +191,7 @@ def draw_mode_button(mode):
 def cycle_mode():
     """Cycle to the next display mode"""
     global current_mode
-    # TEMPORARY: Only Battery mode enabled
-    modes = ["Battery"]
-    # modes = ["Clock", "Bedroom", "Weather", "Battery", "Cycle"]  # Original modes
+    modes = ["Clock", "Bedroom", "Weather", "Cycle"]
     current_index = modes.index(current_mode)
     next_index = (current_index + 1) % len(modes)
     current_mode = modes[next_index]
@@ -321,10 +299,6 @@ def update_display_for_mode(mode):
         bitmap_fonts.draw_text(lcd, humidity_display, humidity_x, 155, lcd.white, spacing=2)
         lcd.text("%", humidity_x + humidity_width + 4, 165, lcd.white)
 
-    elif mode == "Battery":
-        # Battery display mode - circular gauge with background image
-        battery_monitor.render()
-
     elif mode == "Cycle":
         # Cycle mode cycles through Clock, Weather, and Sensors
         # Display the current sub-mode
@@ -428,10 +402,6 @@ def update_display_for_mode(mode):
             else:
                 lcd.write_text("--%", 95, 165, 2, 0x7BEF)  # Gray
 
-        elif sub_mode == "Battery":
-            # Battery display in cycle mode
-            battery_monitor.render()
-
     # Draw mode button at the bottom
     draw_mode_button(mode)
 
@@ -455,7 +425,6 @@ print(f"Switched to {current_mode} mode")
 last_sensor_update = time.ticks_ms()
 last_clock_update = time.ticks_ms()
 last_custom_update = time.ticks_ms()
-last_battery_check = time.ticks_ms()
 last_touch_time = 0
 
 while True:
@@ -484,29 +453,21 @@ while True:
             # Reset flag even if we ignore the touch
             touch.Flag = 0
 
-    # TEMPORARY: Clock and Cycle modes disabled
     # Update clock display every minute if in clock mode
-    # if current_mode == "Clock" and time.ticks_diff(time.ticks_ms(), last_clock_update) > 60000:
-    #     update_display_for_mode(current_mode)
-    #     last_clock_update = time.ticks_ms()
+    if current_mode == "Clock" and time.ticks_diff(time.ticks_ms(), last_clock_update) > 60000:
+        update_display_for_mode(current_mode)
+        last_clock_update = time.ticks_ms()
 
     # Cycle mode display every 10 seconds
-    # if current_mode == "Cycle" and time.ticks_diff(time.ticks_ms(), last_custom_update) > 10000:
-    #     current_custom_index = (current_custom_index + 1) % len(custom_sub_modes)
-    #     print(f"Cycle mode cycling to: {custom_sub_modes[current_custom_index]}")
-    #     update_display_for_mode(current_mode)
-    #     last_custom_update = time.ticks_ms()
+    if current_mode == "Cycle" and time.ticks_diff(time.ticks_ms(), last_custom_update) > 10000:
+        current_custom_index = (current_custom_index + 1) % len(custom_sub_modes)
+        print(f"Cycle mode cycling to: {custom_sub_modes[current_custom_index]}")
+        update_display_for_mode(current_mode)
+        last_custom_update = time.ticks_ms()
 
     # Send sensor data periodically (every 10 seconds)
     if time.ticks_diff(time.ticks_ms(), last_sensor_update) > 10000:
         send_sensor_data()
         last_sensor_update = time.ticks_ms()
-
-    # Check battery data staleness (every 30 seconds)
-    if time.ticks_diff(time.ticks_ms(), last_battery_check) > 30000:
-        if battery_monitor.is_stale():
-            status = battery_monitor.get_status()
-            print(f"WARNING: Battery data stale (age: {status['age_ms']}ms)")
-        last_battery_check = time.ticks_ms()
 
     time.sleep(0.1)

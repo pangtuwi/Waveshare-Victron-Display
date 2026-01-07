@@ -16,16 +16,38 @@ A MicroPython project for the Waveshare RP2350-Touch-LCD-1.28 display that integ
 
 ## Project Structure
 
-- `main.py` - Main application code for Home Assistant integration
+### Core Files
+- `main.py` - Main application code for Home Assistant integration with Battery mode
+- `old_main.py` - Backup of main.py before battery monitor integration
 - `LCD_1inch28.py` - Hardware driver library (LCD, Touch, IMU) - renamed from RP2350-TOUCH-LCD-1.28.py
 - `circular_gauge.py` - Circular gauge/progress display module with segmented arcs
+- `battery_monitor.py` - Battery SOC display module using circular gauge with background image
 - `bitmap_fonts.py` - 16x24 pixel bitmap font for digits and colon
 - `bitmap_fonts_32.py` - 24x32 pixel bitmap font for larger displays
 - `bitmap_fonts_48.py` - 32x48 pixel bitmap font for extra large displays
+
+### Image Display System
+- `convert_image.py` - PC tool to convert JPG/PNG to RGB565 with BRG format and gamma correction
+- `image_data.py` - Storage for converted image byte arrays (chunked format for memory efficiency)
+- `image_display.py` - Display utilities for backgrounds with text/graphics overlays
+- `test_image.py` - Image display test suite
+- `COLOR_NOTES.md` - Complete color system documentation and hardware limitations
+
+### Standalone Applications
+- `jtj.py` - **State of Charge (SOC) Display** - Reads 0-5V analog via ADS1115 I2C ADC and displays SOC percentage on circular gauge
+
+### Test Files
 - `screentest.py` - Comprehensive test suite for display features and CircularGauge
+- `color_calibration.py` - Color accuracy test suite with gamma correction
+- `old_color_tests/` - Diagnostic test scripts from color system development
+
+### Home Assistant Integration
 - `ESP32-s3.YAML` - ESPHome configuration for ESP32-S3 WiFi/UART bridge
 - `home_assistant_automation.yaml` - Example Home Assistant automations
+
+### Documentation
 - `BITMAP_FONTS_README.md` - Guide for creating custom bitmap fonts
+- `COLOR_NOTES.md` - Color system technical documentation
 - `WAVESHARE_RP2350B.uf2` - MicroPython firmware for RP2350B
 
 ## Key Architecture
@@ -54,6 +76,7 @@ Commands are line-delimited ASCII strings sent from ESP32 to RP2350:
 - `WEATHER:<condition>,<temperature>,<humidity>` - Update weather data
 - `HIVE:<current_temp>,<target_temp>,<heating_status>,<hotwater_status>` - Update Hive thermostat data
 - `BEDROOM:<temperature>,<humidity>` - Update bedroom temperature sensor data
+- `BATTERY:<soc>` - Update battery State of Charge (0-100%)
 
 **Sensor Responses** (RP2350 to ESP32):
 - `SENSOR:{json_data}` - Sends sensor data every 10 seconds
@@ -81,14 +104,22 @@ Commands are line-delimited ASCII strings sent from ESP32 to RP2350:
   - Humidity display using 16x24 bitmap font
   - No decimal places on temperature
 
+- **Battery**:
+  - Circular gauge display with background image
+  - Shows battery State of Charge (SOC) 0-100%
+  - Arc from 215° to 320° (clockwise, bottom arc)
+  - 20 segments with white fill on magenta background
+  - Updates via UART `BATTERY:<soc>` command
+  - Based on jtj.py standalone display design
+
 - **Cycle**:
-  - Automatically cycles through Clock → Weather → Bedroom every 10 seconds
+  - Automatically cycles through Clock → Weather → Bedroom → Battery every 10 seconds
   - Uses same layouts as individual modes
 
 ### Mode Selection
 - Touch button at bottom of screen (y: 210-240)
 - Button displays current mode name
-- Touch to cycle: Clock → Bedroom → Weather → Cycle → Clock
+- Touch to cycle: Clock → Bedroom → Weather → Battery → Cycle → Clock
 - 500ms debounce to prevent double-presses
 
 ### Bitmap Fonts
@@ -248,6 +279,9 @@ Use `mpremote` to copy all required files:
 mpremote cp main.py :main.py
 mpremote cp LCD_1inch28.py :LCD_1inch28.py
 mpremote cp circular_gauge.py :circular_gauge.py
+mpremote cp battery_monitor.py :battery_monitor.py
+mpremote cp image_display.py :image_display.py
+mpremote cp image_data.py :image_data.py
 mpremote cp bitmap_fonts.py :bitmap_fonts.py
 mpremote cp bitmap_fonts_32.py :bitmap_fonts_32.py
 mpremote cp bitmap_fonts_48.py :bitmap_fonts_48.py
@@ -364,10 +398,85 @@ With gamma correction:
 4. Weather data display
 5. Hive thermostat integration (legacy support)
 6. Bedroom temperature sensor display with dark grey background
-7. Auto-cycling Cycle mode
-8. Mode button displays current mode name
-9. Multiple background colors (black for Clock/Weather, dark grey for Bedroom)
-10. Large temperature displays with humidity
+7. **Battery monitor mode** with circular gauge and background image
+8. Auto-cycling Cycle mode (includes Battery display)
+9. Mode button displays current mode name
+10. Multiple background colors (black for Clock/Weather, dark grey for Bedroom)
+11. Large temperature displays with humidity
+12. Image display system with gamma correction
+13. Standalone SOC display with ADS1115 ADC (jtj.py)
+
+## Standalone Applications
+
+### State of Charge (SOC) Display (`jtj.py`)
+
+A standalone application that reads a 0-5V analog signal via ADS1115 I2C ADC and displays the State of Charge as a percentage on a circular gauge with background image.
+
+**Hardware Requirements**:
+- ADS1115 16-bit I2C ADC module
+- 0-5V analog input signal (e.g., from battery management system)
+
+**Connections**:
+- **ADS1115 VDD** → 3.3V
+- **ADS1115 GND** → GND
+- **ADS1115 SDA** → GPIO6 (shared I2C bus with touch/IMU)
+- **ADS1115 SCL** → GPIO7 (shared I2C bus with touch/IMU)
+- **ADS1115 ADDR** → GND (sets I2C address to 0x48)
+- **ADS1115 A0** → 0-5V signal input (no voltage divider needed)
+
+**Features**:
+- 16-bit ADC resolution (0.125mV per step)
+- ±4.096V measurement range (ideal for 0-5V signals)
+- Automatic voltage averaging (5 samples) to reduce noise
+- Linear SOC mapping: 0V = 0%, 5.0V = 100%
+- Real-time updates every 1 second
+- Circular gauge display with background image
+- I2C bus scanning for automatic device detection
+
+**Configuration**:
+```python
+MAX_VOLTAGE = 5.0   # Maximum input voltage (5V = 100% SOC)
+ADC_CHANNEL = 0     # Use AIN0 (A0 pin on ADS1115)
+```
+
+**Usage**:
+```bash
+mpremote cp jtj.py :jtj.py
+mpremote run jtj.py
+```
+
+**Console Output**:
+```
+=== SOC Display Starting (ADS1115) ===
+Scanning I2C bus...
+Found I2C devices at addresses: ['0x15', '0x48', '0x6b']
+ADS1115 found at 0x48
+SOC Display initialized
+ADS1115 ADC on I2C, channel A0
+Expecting 0-5.0V input (±4.096V range)
+Initial: 3.45V = 69% SOC
+Voltage: 3.45V, SOC: 69%
+...
+```
+
+**ADS1115 I2C Addresses**:
+- ADDR → GND: 0x48 (default)
+- ADDR → VDD: 0x49
+- ADDR → SDA: 0x4A
+- ADDR → SCL: 0x4B
+
+**ADS1115 Driver**:
+The application includes a simple ADS1115 driver class that:
+- Configures single-ended input on specified channel (0-3)
+- Sets ±4.096V gain for optimal 0-5V measurement
+- Uses single-shot conversion mode (128 SPS)
+- Returns voltage as a float value
+
+**Customization**:
+- Change `ADC_CHANNEL` to use A1, A2, or A3 inputs
+- Modify `MAX_VOLTAGE` for different voltage ranges
+- Adjust gauge appearance (colors, size, arc range) in `CircularGauge` configuration
+- Replace background image in `image_data.py`
 
 ## Extending the Project
 
