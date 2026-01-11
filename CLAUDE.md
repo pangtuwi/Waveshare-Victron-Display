@@ -2,268 +2,150 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Waveshare RP2350 Touch LCD Home Assistant Display
+## Victron Battery Display System
 
-A MicroPython project for the Waveshare RP2350-Touch-LCD-1.28 display that integrates with Home Assistant via UART communication through an ESP32 bridge.
+A MicroPython project for the Waveshare RP2350-Touch-LCD-1.28 display that shows Victron battery system data received from a Raspberry Pi Pico via UART communication.
 
 **Hardware**: Waveshare RP2350-Touch-LCD-1.28
-- 240x240 pixel round LCD display
+- 240×240 pixel round LCD display (GC9A01 driver)
 - CST816T capacitive touch controller
 - QMI8658 6-axis IMU (accelerometer + gyroscope)
-- RP2350B microcontroller
+- RP2350B microcontroller running MicroPython
 
-**Current Version**: Development
+**Current Version**: v1.0
+
+## Project Purpose
+
+This display system receives Victron battery data from a Raspberry Pi Pico and displays it across 4 pages:
+1. **Battery Monitor** - Circular gauge showing SOC (State of Charge)
+2. **System Information** - Detailed battery metrics (SOC, voltage, current, temperature)
+3. **Charging** - Auto-displays when battery is charging
+4. **About** - Application information
 
 ## Project Structure
 
 ### Core Files
-- `main.py` - Main application code for Home Assistant integration with Battery mode
-- `old_main.py` - Backup of main.py before battery monitor integration
-- `LCD_1inch28.py` - Hardware driver library (LCD, Touch, IMU) - renamed from RP2350-TOUCH-LCD-1.28.py
+- `main.py` - Main application with 4-page battery display system
+- `LCD_1inch28.py` - Hardware driver library (LCD, Touch, IMU)
 - `circular_gauge.py` - Circular gauge/progress display module with segmented arcs
 - `battery_monitor.py` - Battery SOC display module using circular gauge with background image
-- `bitmap_fonts.py` - 16x24 pixel bitmap font for digits and colon
-- `bitmap_fonts_32.py` - 24x32 pixel bitmap font for larger displays
-- `bitmap_fonts_48.py` - 32x48 pixel bitmap font for extra large displays
+- `bitmap_fonts.py` - 16×24 pixel bitmap font for digits and colon
+- `bitmap_fonts_32.py` - 24×32 pixel bitmap font for larger displays
+- `bitmap_fonts_48.py` - 32×48 pixel bitmap font for extra large displays
 
 ### Image Display System
 - `convert_image.py` - PC tool to convert JPG/PNG to RGB565 with BRG format and gamma correction
 - `image_data.py` - Storage for converted image byte arrays (chunked format for memory efficiency)
 - `image_display.py` - Display utilities for backgrounds with text/graphics overlays
-- `test_image.py` - Image display test suite
 - `COLOR_NOTES.md` - Complete color system documentation and hardware limitations
 
-### Standalone Applications
-- `jtj.py` - **State of Charge (SOC) Display** - Reads 0-5V analog via ADS1115 I2C ADC and displays SOC percentage on circular gauge
-
 ### Test Files
+- `jtj.py` - Standalone SOC display with simulated data (for testing)
 - `screentest.py` - Comprehensive test suite for display features and CircularGauge
 - `color_calibration.py` - Color accuracy test suite with gamma correction
 - `old_color_tests/` - Diagnostic test scripts from color system development
 
-### Home Assistant Integration
-- `ESP32-s3.YAML` - ESPHome configuration for ESP32-S3 WiFi/UART bridge
-- `home_assistant_automation.yaml` - Example Home Assistant automations
-
 ### Documentation
+- `README.md` - Project overview and quick start guide
+- `PICO_INTEGRATION.md` - Complete Raspberry Pi Pico integration guide
+- `PROJECT_SUMMARY.md` - Full project documentation
+- `QUICK_REFERENCE.md` - Command reference card
 - `BITMAP_FONTS_README.md` - Guide for creating custom bitmap fonts
 - `COLOR_NOTES.md` - Color system technical documentation
-- `WAVESHARE_RP2350B.uf2` - MicroPython firmware for RP2350B
 
-## Key Architecture
+### Legacy Files (From Original Project)
+- `old_main.py` - Backup of main.py before Victron adaptation
+- `ESP32-s3.YAML` - ESPHome configuration (legacy Home Assistant integration)
+- `home_assistant_automation.yaml` - Example Home Assistant automations (legacy)
+- `DISPLAY_INTEGRATION.md` - Battery monitor integration guide (legacy)
 
-### Hardware Communication
-The project uses a three-tier communication architecture:
-1. **Home Assistant** sends commands via ESPHome services
-2. **ESP32-S3** acts as WiFi bridge, forwards commands over UART (115200 baud, GPIO43/44)
-3. **RP2350** receives UART commands (GPIO16/17) and controls the display
+## Hardware Communication
+
+### UART Connection
+The project uses direct UART communication:
+1. **Raspberry Pi Pico** reads Victron battery data (VE.Direct protocol at 19200 baud)
+2. **Pico** processes data and sends formatted commands to display (115200 baud)
+3. **RP2350 Display** receives commands via UART (GPIO16/17) and updates display
+
+### Wiring
+```
+Pico                    RP2350 Display
+────────────────────    ──────────────────
+GPIO0 (UART0 TX)   →    GPIO17 (UART0 RX)
+GPIO1 (UART0 RX)   ←    GPIO16 (UART0 TX)
+GND                ─    GND
+```
 
 ### UART Command Protocol
-Commands are line-delimited ASCII strings sent from ESP32 to RP2350:
+Commands are line-delimited ASCII strings sent from Pico to RP2350:
 
-**Display Commands**:
-- `MSG:<text>` - Display text message
-- `DISP:<data>` - Custom display text
-- `CMD:CLEAR` - Clear display
+**Battery Data Commands**:
+- `BATTERY:<soc>` - Update battery State of Charge (0-100%)
+  - Example: `BATTERY:75\n`
+- `BATSYS:<voltage>,<current>,<temp>` - Update battery system data
+  - voltage: Battery voltage in volts (e.g., 48.5)
+  - current: Current in amps (positive=charging, negative=discharging)
+  - temp: Battery temperature in °C
+  - Example: `BATSYS:48.5,12.3,25.5\n`
+- `CHARGING:<state>` - Update charging state (0=not charging, 1=charging)
+  - Example: `CHARGING:1\n`
+  - Auto-displays Charging page when state changes to 1
 
 **Configuration Commands**:
 - `BRIGHT:<0-100>` - Set brightness percentage (0-100)
-- `MODE:<mode_name>` - Set display mode (Clock/Bedroom/Weather/Cycle)
-- `COLOR:<r>,<g>,<b>` - Set text color (RGB values 0-255)
-- `SETTIME:<YYYY>,<MM>,<DD>,<HH>,<MM>,<SS>,<WEEKDAY>,<YEARDAY>` - Set RTC time
+  - Example: `BRIGHT:75\n`
+- `MODE:<mode_name>` - Set display mode (Battery/SystemInfo/Charging/About)
+  - Example: `MODE:SystemInfo\n`
+  - Note: Touch navigation is preferred; use only for testing
 
-**Data Update Commands**:
-- `WEATHER:<condition>,<temperature>,<humidity>` - Update weather data
-- `HIVE:<current_temp>,<target_temp>,<heating_status>,<hotwater_status>` - Update Hive thermostat data
-- `BEDROOM:<temperature>,<humidity>` - Update bedroom temperature sensor data
-- `BATTERY:<soc>` - Update battery State of Charge (0-100%)
+## Display Pages
 
-**Sensor Responses** (RP2350 to ESP32):
-- `SENSOR:{json_data}` - Sends sensor data every 10 seconds
+### 1. Battery Monitor (Default Page)
+- **Circular gauge** showing State of Charge (0-100%)
+- **Background image** (customizable)
+- **Auto-return**: All other pages return here after 10 seconds of inactivity
+- Updated via `BATTERY:<soc>` command
 
-### Display Modes
+### 2. System Information
+- **State of Charge (%)** - Large display using 24×32 bitmap font
+- **Voltage (V)** - Battery voltage
+- **Current (A)** - Color-coded:
+  - Green: Charging (positive current)
+  - Red: Discharging (negative current)
+  - White: Idle (0A)
+- **Temperature (°C)** - Battery temperature
+- Updated via `BATSYS:<voltage>,<current>,<temp>` command
 
-- **Clock**:
-  - Black background with white text
-  - Shows date with day name (e.g., "Mon 1/12/2025")
-  - Large time display using 16x24 bitmap font
-  - 12-hour format with AM/PM indicator
-  - Auto-updates every minute
+### 3. Charging Page (Auto-appears)
+- **Green charging bolt icon**
+- **Charging metrics**:
+  - Current charging rate (+A)
+  - Battery voltage (V)
+  - Current SOC (%)
+- **Auto-display**: Appears when `CHARGING:1` received
+- **Auto-dismiss**: Returns to Battery page after 10s or when charging stops
 
-- **Bedroom**:
-  - Dark grey background (RGB 64,64,64) with white text
-  - Title: "BEDROOM"
-  - Large temperature display using 24x32 bitmap font
-  - Humidity display using 16x24 bitmap font
-  - Data from Home Assistant bedroom temperature sensor
+### 4. About Page
+- **Application name**: "Victron Battery Display System"
+- **Version**: v1.0
+- **Developer**: Paul Williams
 
-- **Weather**:
-  - Black background with white text
-  - Weather condition at top
-  - Very large temperature using 32x48 bitmap font
-  - Humidity display using 16x24 bitmap font
-  - No decimal places on temperature
+## Page Navigation
 
-- **Battery**:
-  - Circular gauge display with background image
-  - Shows battery State of Charge (SOC) 0-100%
-  - Arc from 215° to 320° (clockwise, bottom arc)
-  - 20 segments with white fill on magenta background
-  - Updates via UART `BATTERY:<soc>` command
-  - Based on jtj.py standalone display design
+### Touch Controls
+- **Touch anywhere on screen**: Cycle through pages
+  ```
+  Battery → System Info → About → Battery → ...
+  ```
+- **Charging page**: Only appears when charging is active
+- **Auto-return**: All pages return to Battery page after 10 seconds
+- **Debounce**: 500ms between touch events
 
-- **Cycle**:
-  - Automatically cycles through Clock → Weather → Bedroom → Battery every 10 seconds
-  - Uses same layouts as individual modes
-
-### Mode Selection
-- Touch button at bottom of screen (y: 210-240)
-- Button displays current mode name
-- Touch to cycle: Clock → Bedroom → Weather → Battery → Cycle → Clock
-- 500ms debounce to prevent double-presses
-
-### Bitmap Fonts
-Custom bitmap fonts for crisp, large number displays:
-- **bitmap_fonts.py**: 16x24 pixel font (digits 0-9, colon)
-- **bitmap_fonts_32.py**: 24x32 pixel font (digits 0-9, colon)
-- **bitmap_fonts_48.py**: 32x48 pixel font (digits 0-9, colon)
-- Functions: `draw_char()`, `draw_text()`, `get_text_width()` (and _32, _48 variants)
-- See BITMAP_FONTS_README.md for creating custom fonts
-
-### Circular Gauge Module (circular_gauge.py)
-
-**CircularGauge class** - Progressive fill circular gauge/progress indicator:
-- Displays values as segmented arcs around the display perimeter
-- Configurable parameters:
-  - **Segments**: 4-20 segments (validated and clamped)
-  - **Angles**: Start/end angles in degrees (supports wraparound >360°)
-  - **Thickness**: Arc thickness in pixels
-  - **Gap**: Gap between segments in degrees
-  - **Colors**: Foreground (filled) and background (unfilled) segments
-  - **Direction**: Counter-clockwise (default) or clockwise drawing
-
-**Angle System**:
-- 0° = Right (3 o'clock)
-- 90° = Top (12 o'clock)
-- 180° = Left (9 o'clock)
-- 270° = Bottom (6 o'clock)
-- Counter-clockwise increases angle (default)
-- Clockwise decreases angle (set `clockwise=True`)
-
-**Example - Top arc gauge**:
-```python
-from circular_gauge import CircularGauge
-
-gauge = CircularGauge(
-    lcd=lcd,
-    center_x=120, center_y=120,
-    radius=110, thickness=12,
-    segments=16,
-    start_angle=135,  # Top-left
-    end_angle=405,    # Top-right (270° arc)
-    gap_degrees=2,
-    color=0xFFFF,     # White
-    background_color=0x2104  # Dark grey for unfilled
-)
-gauge.update(75)  # Set to 75% and draw
-lcd.show()
-```
-
-**Example - Bottom arc (speedometer style)**:
-```python
-gauge = CircularGauge(
-    lcd=lcd,
-    center_x=120, center_y=150,
-    radius=100, thickness=15,
-    segments=12,
-    start_angle=225,  # Bottom-left
-    end_angle=495,    # Bottom-right (270° arc)
-    gap_degrees=2,
-    color=rgb_to_brg565(0, 255, 0)  # Green
-)
-```
-
-**Example - Clockwise gauge**:
-```python
-gauge = CircularGauge(
-    lcd=lcd,
-    center_x=120, center_y=120,
-    radius=110, thickness=12,
-    segments=8,
-    start_angle=45,   # Top-right
-    end_angle=315,    # Bottom-right (90° clockwise)
-    gap_degrees=2,
-    color=0xFFFF,
-    clockwise=True    # Draw clockwise instead of counter-clockwise
-)
-```
-
-**Methods**:
-- `set_value(percentage)` - Set gauge value (0-100)
-- `draw()` - Draw gauge to LCD buffer
-- `update(percentage)` - Set value and draw in one call
-- `draw_with_partial_refresh()` - Draw and use Windows_show() for efficiency
-- `draw_incremental(old_value)` - Only redraw changed segments
-
-**Helper function**:
-- `rgb_to_brg565(r, g, b)` - Convert RGB888 to BRG565 format for correct color display
-
-**Performance**:
-- Single segment (~10px thick, 20° arc): ~5-10ms
-- Full 12-segment gauge: ~60-120ms
-- Suitable for real-time sensor data updates (1-2 second intervals)
-
-**Use Cases**:
-- Temperature gauges
-- Humidity indicators
-- Battery level displays
-- Progress indicators
-- Speed/RPM displays
-- Any percentage-based visualization
-
-### Driver Library (LCD_1inch28.py)
-
-**LCD_1inch28 class**:
-- Inherits from `framebuf.FrameBuffer` (RGB565 format)
-- 240x240 pixel buffer (115,200 bytes)
-- SPI communication at 100 MHz
-- Methods: `show()`, `Windows_show()`, `write_text()`, `set_bl_pwm()`
-- Predefined colors: red, green, blue, white, black, brown (note: RGB/BRG format swap)
-
-**Touch_CST816T class**:
-- I2C communication (address 0x15)
-- Point mode (mode=1) for coordinate detection
-- Interrupt-driven touch detection with Flag polling
-- Touch coordinates: X_point, Y_point (0-239)
-
-**QMI8658 class** (6-DOF IMU):
-- I2C address 0x6B
-- Accelerometer range: ±8g at 1000Hz
-- Gyroscope range: ±512dps at 1000Hz
-- Returns 6-axis data: [acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z]
-
-## ESP32 Integration
-
-### ESPHome Services
-The ESP32-s3.YAML defines the following services:
-
-- `esphome.esphome_web_b11440_send_weather` - Send weather data
-  - Parameters: condition, temperature, humidity
-
-- `esphome.esphome_web_b11440_send_hive` - Send Hive thermostat data
-  - Parameters: current_temp, target_temp, heating_status, hotwater_status
-
-- `esphome.esphome_web_b11440_send_bedroom` - Send bedroom temperature data
-  - Parameters: temperature, humidity
-
-- `esphome.esphome_web_b11440_send_notification` - Send notification
-  - Parameters: title, message, color
-
-### Time Synchronization
-- Home Assistant time platform syncs to ESP32
-- On boot: 20 second delay, then sends time to RP2350
-- Retry after 60 seconds if first attempt fails
-- Hourly sync on the hour (00 minutes)
+### Navigation Behavior
+- No bottom button (full-screen touch navigation)
+- Touch to cycle: Battery → SystemInfo → About → Battery
+- Charging page auto-appears and is not in normal cycle
+- 10-second timeout returns to Battery page from any other page
 
 ## Development Commands
 
@@ -287,12 +169,6 @@ mpremote cp bitmap_fonts_32.py :bitmap_fonts_32.py
 mpremote cp bitmap_fonts_48.py :bitmap_fonts_48.py
 ```
 
-For testing the CircularGauge module:
-```bash
-mpremote cp screentest.py :screentest.py
-mpremote run screentest.py
-```
-
 ### Running the Application
 Code auto-runs on boot when saved as `main.py`. To test manually:
 ```bash
@@ -302,6 +178,22 @@ mpremote run main.py
 ### Monitoring UART Communication
 ```bash
 mpremote  # Opens REPL, shows print() output
+```
+
+### Testing Commands
+Send test commands via REPL:
+```python
+# Test SOC update
+uart.write(b'BATTERY:75\n')
+
+# Test system data
+uart.write(b'BATSYS:48.5,12.3,25.5\n')
+
+# Test charging state
+uart.write(b'CHARGING:1\n')
+
+# Test brightness
+uart.write(b'BRIGHT:50\n')
 ```
 
 ## Important Implementation Notes
@@ -328,16 +220,6 @@ def apply_gamma_correction(value, gamma=2.2):
     return int(corrected * 255.0)
 ```
 
-Without gamma correction:
-- Red gradients show as blue
-- Green gradients show as black/green bands
-- Blue gradients show as green
-
-With gamma correction:
-- ✅ Single-color gradients display correctly
-- ✅ Images display with accurate colors
-- ✅ Full-intensity colors (255) work perfectly
-
 **Hardware Limitations:**
 - ⚠️ Grayscale (equal R=G=B values) is fundamentally broken at intermediate values
 - Root cause: Display has mismatched per-channel hardware gamma curves
@@ -348,8 +230,8 @@ With gamma correction:
 ### UART Communication
 - Baudrate: 115200
 - RP2350: TX=GPIO16, RX=GPIO17
-- ESP32-S3: TX=GPIO43, RX=GPIO44
-- Commands must be newline-terminated
+- Pico: TX=GPIO0, RX=GPIO1 (or any UART-capable pins)
+- Commands must be newline-terminated (`\n`)
 - Always decode bytes: `cmd_line.decode().strip()`
 - Wrap command processing in try/except to prevent crashes
 
@@ -359,153 +241,160 @@ With gamma correction:
 - Poll `touch.Flag` for new touch events (interrupt-driven)
 - Access coordinates via `touch.X_point`, `touch.Y_point`
 - 500ms debounce using `time.ticks_ms()` and `time.ticks_diff()`
+- Full-screen touch cycles through pages (no button area)
 
 ### Display Text Rendering
 - `lcd.text(str, x, y, color)` - Standard 8×8 font
 - `lcd.write_text(str, x, y, size, color)` - Scalable font (size multiplier)
-- `bitmap_fonts.draw_text(lcd, text, x, y, color, spacing)` - 16x24 bitmap font
-- `bitmap_fonts_32.draw_text_32(lcd, text, x, y, color, spacing)` - 24x32 bitmap font
-- `bitmap_fonts_48.draw_text_48(lcd, text, x, y, color, spacing)` - 32x48 bitmap font
+- `bitmap_fonts.draw_text(lcd, text, x, y, color, spacing)` - 16×24 bitmap font
+- `bitmap_fonts_32.draw_text_32(lcd, text, x, y, color, spacing)` - 24×32 bitmap font
+- `bitmap_fonts_48.draw_text_48(lcd, text, x, y, color, spacing)` - 32×48 bitmap font
 - Bitmap fonts provide crisp, professional-looking large numbers
 
-### RTC (Real-Time Clock)
-- RTC synced from Home Assistant via ESP32 on boot
-- Format: `(year, month, day, weekday, hour, minute, second, subsecond)`
-- Access time: `time.localtime()` after RTC is set
-- Clock mode auto-refreshes every 60 seconds
+## Circular Gauge Module (circular_gauge.py)
 
-## Home Assistant Integration
+**CircularGauge class** - Progressive fill circular gauge/progress indicator:
+- Displays values as segmented arcs around the display perimeter
+- Configurable parameters:
+  - **Segments**: 4-20 segments (validated and clamped)
+  - **Angles**: Start/end angles in degrees (supports wraparound >360°)
+  - **Thickness**: Arc thickness in pixels
+  - **Gap**: Gap between segments in degrees
+  - **Colors**: Foreground (filled) and background (unfilled) segments
+  - **Direction**: Counter-clockwise (default) or clockwise drawing
 
-### Required Entity IDs (Update in automations)
-- Weather: `weather.forecast_home`
-- Hive Thermostat: `climate.hive_thermostat`
-- Hive Hot Water: `water_heater.hive_hot_water`
-- Bedroom Temperature: `sensor.temp_sensor_1_bedroom_temperature`
-- Bedroom Humidity: `sensor.temp_sensor_1_bedroom_humidity`
+**Angle System**:
+- 0° = Right (3 o'clock)
+- 90° = Top (12 o'clock)
+- 180° = Left (9 o'clock)
+- 270° = Bottom (6 o'clock)
 
-### Automation Triggers
-- Weather: Every 5 minutes OR on state change
-- Hive: Every 2 minutes OR on state change
-- Bedroom: Every 2 minutes OR on state change
-- Time: On boot (20s delay) + hourly
-
-## Current Features
-
-✅ **Implemented**:
-1. Time synchronization from Home Assistant
-2. Touch-based mode cycling
-3. Custom bitmap fonts for large, crisp displays
-4. Weather data display
-5. Hive thermostat integration (legacy support)
-6. Bedroom temperature sensor display with dark grey background
-7. **Battery monitor mode** with circular gauge and background image
-8. Auto-cycling Cycle mode (includes Battery display)
-9. Mode button displays current mode name
-10. Multiple background colors (black for Clock/Weather, dark grey for Bedroom)
-11. Large temperature displays with humidity
-12. Image display system with gamma correction
-13. Standalone SOC display with ADS1115 ADC (jtj.py)
-
-## Standalone Applications
-
-### State of Charge (SOC) Display (`jtj.py`)
-
-A standalone application that reads a 0-5V analog signal via ADS1115 I2C ADC and displays the State of Charge as a percentage on a circular gauge with background image.
-
-**Hardware Requirements**:
-- ADS1115 16-bit I2C ADC module
-- 0-5V analog input signal (e.g., from battery management system)
-
-**Connections**:
-- **ADS1115 VDD** → 3.3V
-- **ADS1115 GND** → GND
-- **ADS1115 SDA** → GPIO6 (shared I2C bus with touch/IMU)
-- **ADS1115 SCL** → GPIO7 (shared I2C bus with touch/IMU)
-- **ADS1115 ADDR** → GND (sets I2C address to 0x48)
-- **ADS1115 A0** → 0-5V signal input (no voltage divider needed)
-
-**Features**:
-- 16-bit ADC resolution (0.125mV per step)
-- ±4.096V measurement range (ideal for 0-5V signals)
-- Automatic voltage averaging (5 samples) to reduce noise
-- Linear SOC mapping: 0V = 0%, 5.0V = 100%
-- Real-time updates every 1 second
-- Circular gauge display with background image
-- I2C bus scanning for automatic device detection
-
-**Configuration**:
+**Example - Bottom arc gauge (used for battery)**:
 ```python
-MAX_VOLTAGE = 5.0   # Maximum input voltage (5V = 100% SOC)
-ADC_CHANNEL = 0     # Use AIN0 (A0 pin on ADS1115)
+from circular_gauge import CircularGauge
+
+gauge = CircularGauge(
+    lcd=lcd,
+    center_x=120, center_y=120,
+    radius=115, thickness=10,
+    segments=20,
+    start_angle=215,  # Bottom-left
+    end_angle=320,    # Bottom-right
+    gap_degrees=2,
+    clockwise=True,
+    color=0xFFFF,     # White
+    background_color=0xE67AE6  # Magenta
+)
+gauge.update(75)  # Set to 75% and draw
+lcd.show()
 ```
 
-**Usage**:
-```bash
-mpremote cp jtj.py :jtj.py
-mpremote run jtj.py
+**Methods**:
+- `set_value(percentage)` - Set gauge value (0-100)
+- `draw()` - Draw gauge to LCD buffer
+- `update(percentage)` - Set value and draw in one call
+
+**Helper function**:
+- `rgb_to_brg565(r, g, b)` - Convert RGB888 to BRG565 format for correct color display
+
+## Raspberry Pi Pico Integration
+
+### Reading Victron Data
+Your Pico should read data from the Victron battery system using the VE.Direct protocol (19200 baud UART). See:
+- [Raspberry-Pi-Victron-Connect](https://github.com/pangtuwi/Raspberry-Pi-Victron-Connect)
+- [Victron VE.Direct Protocol Whitepaper](https://www.victronenergy.com/upload/documents/VE.Direct-Protocol-3.33.pdf)
+
+### Example Pico Code
+```python
+from machine import UART, Pin
+import time
+
+# UART to display
+display_uart = UART(0, baudrate=115200, tx=Pin(0), rx=Pin(1))
+
+# Send battery data
+def update_display(soc, voltage, current, temp, charging):
+    display_uart.write(f"BATTERY:{int(soc)}\n".encode())
+    display_uart.write(f"BATSYS:{voltage:.2f},{current:.2f},{temp:.1f}\n".encode())
+    display_uart.write(f"CHARGING:{1 if charging else 0}\n".encode())
+
+# Main loop
+while True:
+    # Read from Victron system (VE.Direct protocol)
+    soc = 75  # State of charge 0-100%
+    voltage = 48.5  # Battery voltage in V
+    current = 12.3  # Current in A (positive=charging, negative=discharging)
+    temp = 25.5  # Temperature in °C
+    charging = (current > 0)
+
+    # Send to display
+    update_display(soc, voltage, current, temp, charging)
+    time.sleep(1)  # Update every second
 ```
 
-**Console Output**:
-```
-=== SOC Display Starting (ADS1115) ===
-Scanning I2C bus...
-Found I2C devices at addresses: ['0x15', '0x48', '0x6b']
-ADS1115 found at 0x48
-SOC Display initialized
-ADS1115 ADC on I2C, channel A0
-Expecting 0-5.0V input (±4.096V range)
-Initial: 3.45V = 69% SOC
-Voltage: 3.45V, SOC: 69%
-...
-```
-
-**ADS1115 I2C Addresses**:
-- ADDR → GND: 0x48 (default)
-- ADDR → VDD: 0x49
-- ADDR → SDA: 0x4A
-- ADDR → SCL: 0x4B
-
-**ADS1115 Driver**:
-The application includes a simple ADS1115 driver class that:
-- Configures single-ended input on specified channel (0-3)
-- Sets ±4.096V gain for optimal 0-5V measurement
-- Uses single-shot conversion mode (128 SPS)
-- Returns voltage as a float value
-
-**Customization**:
-- Change `ADC_CHANNEL` to use A1, A2, or A3 inputs
-- Modify `MAX_VOLTAGE` for different voltage ranges
-- Adjust gauge appearance (colors, size, arc range) in `CircularGauge` configuration
-- Replace background image in `image_data.py`
+See `PICO_INTEGRATION.md` for complete integration guide with VE.Direct parsing.
 
 ## Extending the Project
 
-### Adding New Display Modes
-1. Add mode name to `cycle_mode()` modes list
-2. Add `elif mode == "NewMode":` section in `update_display_for_mode()`
+### Adding New Display Pages
+1. Add page name to `cycle_mode()` modes list in main.py
+2. Add `elif mode == "NewPage":` section in `update_display_for_mode()`
 3. Implement display layout using `lcd.text()`, `lcd.write_text()`, or bitmap fonts
-4. Update ESP32-s3.YAML select options
-5. Create Home Assistant automation/service if needed
+4. Add UART command handler if new data is needed
 
-### Adding New Data Sources
-1. Add global variables for data storage
+### Adding New Data Fields
+1. Add global variables for data storage in main.py
 2. Add to `process_command()` global declaration
 3. Implement command handler (e.g., `elif cmd_line.startswith(b'NEWCMD:'):`)
 4. Parse data and update variables
-5. Add ESPHome service in ESP32-s3.YAML
-6. Create Home Assistant automation
-7. Update display mode to show new data
+5. Update display page to show new data
 
 ### Creating Custom Bitmap Fonts
 See BITMAP_FONTS_README.md for:
 - Manual binary creation
 - Image-to-bitmap conversion script
 - Online font generator tools
-- Different font sizes (8x12, 16x24, 24x32, 32x48)
-- Weather icon fonts
+- Different font sizes (8×12, 16×24, 24×32, 32×48)
 
-### Improving Performance
-- Use partial display updates (`Windows_show`) instead of full refreshes
-- Reduce polling frequency in main loop
-- Implement display sleep mode after inactivity
-- Use bitmap fonts for frequently updated large numbers
+### Customizing Background Image
+1. Create a 240×240 pixel image (JPG or PNG)
+2. Convert using: `python convert_image.py your_image.jpg bg_name > output.py`
+3. Copy the output to `image_data.py` on the display
+4. Update `battery_monitor.py` to use the new image index
+
+## Current Features
+
+✅ **Implemented**:
+1. 4-page display system (Battery, SystemInfo, Charging, About)
+2. Full-screen touch navigation with page cycling
+3. 10-second auto-return to Battery page
+4. Charging page auto-detection and display
+5. Custom bitmap fonts for large, crisp displays
+6. Circular gauge for battery SOC visualization
+7. Color-coded current display (green=charging, red=discharging)
+8. Battery monitor with background image
+9. Image display system with gamma correction
+10. UART communication protocol for Pico integration
+11. Real-time battery system monitoring
+
+## Driver Library (LCD_1inch28.py)
+
+**LCD_1inch28 class**:
+- Inherits from `framebuf.FrameBuffer` (RGB565 format)
+- 240×240 pixel buffer (115,200 bytes)
+- SPI communication at 100 MHz
+- Methods: `show()`, `Windows_show()`, `write_text()`, `set_bl_pwm()`
+- Predefined colors: red, green, blue, white, black, brown (note: RGB/BRG format swap)
+
+**Touch_CST816T class**:
+- I2C communication (address 0x15)
+- Point mode (mode=1) for coordinate detection
+- Interrupt-driven touch detection with Flag polling
+- Touch coordinates: X_point, Y_point (0-239)
+
+**QMI8658 class** (6-DOF IMU):
+- I2C address 0x6B
+- Accelerometer range: ±8g at 1000Hz
+- Gyroscope range: ±512dps at 1000Hz
+- Returns 6-axis data: [acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z]
+- Not currently used in battery display modes
