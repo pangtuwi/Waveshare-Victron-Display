@@ -125,13 +125,15 @@ def process_command(cmd_line):
             try:
                 soc = int(soc_str)
                 battery_soc = soc
-                if battery_monitor.update_soc(soc):
-                    print(f"Battery SOC: {soc}%")
-                    # Refresh display if on Battery page
-                    if current_mode == "Battery":
-                        update_display_for_mode(current_mode)
-                else:
-                    print(f"Battery SOC update failed: {soc}")
+                print(f"Battery SOC: {soc}%")
+
+                # Only update battery monitor (which renders) if on Battery page
+                if current_mode == "Battery":
+                    if battery_monitor.update_soc(soc):
+                        # Battery monitor rendered successfully
+                        pass
+                    else:
+                        print(f"Battery SOC update failed: {soc}")
             except ValueError:
                 print(f"Invalid battery SOC format: {soc_str}")
 
@@ -146,8 +148,8 @@ def process_command(cmd_line):
                     battery_current = float(data_parts[1])
                     battery_temp = float(data_parts[2])
                     print(f"Battery system: {battery_voltage}V, {battery_current}A, {battery_temp}°C")
-                    # Refresh display if on SystemInfo page
-                    if current_mode == "SystemInfo":
+                    # Refresh display if on SystemInfo or Charging page (both show this data)
+                    if current_mode == "SystemInfo" or current_mode == "Charging":
                         update_display_for_mode(current_mode)
                 except ValueError:
                     print(f"Invalid battery system data format: {data_str}")
@@ -242,16 +244,14 @@ def update_display_for_mode(mode):
         lcd.hline(10, 40, 220, lcd.white)
 
         # SOC
-        lcd.text("State of Charge:", 20, 60, lcd.white)
+        lcd.text("SOC:", 20, 70, lcd.white)
         soc_text = f"{battery_soc}%"
-        soc_width = bitmap_fonts_32.get_text_width_32(soc_text, spacing=2)
-        soc_x = (240 - soc_width) // 2
-        bitmap_fonts_32.draw_text_32(lcd, soc_text, soc_x, 75, lcd.white, spacing=2)
+        lcd.write_text(soc_text, 140, 67, 2, lcd.white)
 
         # Voltage
-        lcd.text("Voltage:", 20, 120, lcd.white)
+        lcd.text("Voltage:", 20, 110, lcd.white)
         voltage_text = f"{battery_voltage:.2f}V"
-        lcd.write_text(voltage_text, 140, 117, 2, lcd.white)
+        lcd.write_text(voltage_text, 140, 107, 2, lcd.white)
 
         # Current
         lcd.text("Current:", 20, 150, lcd.white)
@@ -268,44 +268,41 @@ def update_display_for_mode(mode):
         lcd.write_text(current_text, 140, 147, 2, current_color)
 
         # Temperature
-        lcd.text("Temperature:", 20, 180, lcd.white)
+        lcd.text("Temperature:", 20, 190, lcd.white)
         temp_text = f"{battery_temp:.1f}"
-        lcd.write_text(temp_text, 140, 177, 2, lcd.white)
-        lcd.text("o", 200, 178, lcd.white)
-        lcd.text("C", 208, 183, lcd.white)
+        lcd.write_text(temp_text, 140, 187, 2, lcd.white)
+        lcd.text("o", 200, 188, lcd.white)
+        lcd.text("C", 208, 193, lcd.white)
 
     elif mode == "Charging":
         # Charging page - displayed when battery is charging
-        # Title with animation indicator
+        # Title
         lcd.text("CHARGING", 80, 30, lcd.white)
 
-        # Draw animated charging bolt icon (simple triangular bolt)
-        # Center coordinates
-        cx, cy = 120, 100
-
-        # Draw charging bolt as filled triangles
-        # Upper triangle (pointing down)
-        for y in range(15):
-            lcd.hline(cx - y//2, cy - 15 + y, y + 1, 0x07E0)  # Green
-        # Lower triangle (pointing up)
-        for y in range(15):
-            lcd.hline(cx - (14-y)//2, cy + y, (14-y) + 1, 0x07E0)  # Green
+        # Draw horizontal line separator
+        lcd.hline(10, 50, 220, lcd.white)
 
         # Charging metrics
-        lcd.text("Current:", 20, 140, lcd.white)
+        lcd.text("Current:", 20, 90, lcd.white)
         if battery_current > 0:
-            charge_text = f"+{battery_current:.2f}A"
+            charge_text = f"+{battery_current:.1f}A"
         else:
-            charge_text = "0.00A"
-        lcd.write_text(charge_text, 130, 137, 2, 0x07E0)  # Green
+            charge_text = "0.0A"
+        lcd.write_text(charge_text, 130, 87, 2, 0x07E0)  # Green
 
-        lcd.text("Voltage:", 20, 170, lcd.white)
-        voltage_text = f"{battery_voltage:.2f}V"
-        lcd.write_text(voltage_text, 130, 167, 2, lcd.white)
+        lcd.text("Voltage:", 20, 130, lcd.white)
+        voltage_text = f"{battery_voltage:.1f}V"
+        lcd.write_text(voltage_text, 130, 127, 2, lcd.white)
 
-        lcd.text("SOC:", 20, 200, lcd.white)
+        lcd.text("SOC:", 20, 170, lcd.white)
         soc_text = f"{battery_soc}%"
-        lcd.write_text(soc_text, 130, 197, 2, lcd.white)
+        lcd.write_text(soc_text, 130, 167, 2, lcd.white)
+
+        lcd.text("Temperature:", 20, 210, lcd.white)
+        temp_text = f"{battery_temp:.1f}"
+        lcd.write_text(temp_text, 130, 207, 2, lcd.white)
+        lcd.text("o", 190, 208, lcd.white)
+        lcd.text("C", 198, 213, lcd.white)
 
     elif mode == "Status":
         # Status page - system status information
@@ -351,7 +348,7 @@ def update_display_for_mode(mode):
 
         # Author information
         lcd.text("Developed by", 75, 160, lcd.white)
-        lcd.write_text("Paul Williams", 50, 177, 2, lcd.white)
+        lcd.text("Paul Williams", 70, 180, lcd.white)
 
     lcd.show()
 
@@ -361,6 +358,10 @@ def check_auto_return_to_battery():
 
     # Don't auto-return if already on Battery page
     if current_mode == "Battery":
+        return
+
+    # Don't auto-return if on Charging page and battery is actively charging
+    if current_mode == "Charging" and is_charging:
         return
 
     # Check if timeout has elapsed
@@ -387,7 +388,7 @@ while True:
     if uart.any():
         cmd_line = uart.readline()
         if cmd_line:
-            print(f"Raw UART data received: {cmd_line}")
+            # print(f"Raw UART data received: {cmd_line}")
             process_command(cmd_line)
 
     # Check for touch events - full screen touch for page navigation

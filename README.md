@@ -184,11 +184,12 @@ BRIGHT:<level>\n
 - Updates via `BATTERY:<soc>` command
 
 ### 2. System Information
-- **State of Charge** - Large display with 24×32 bitmap font
-- **Voltage** - Battery voltage in volts
-- **Current** - Color-coded (Green=charging, Red=discharging, White=idle)
-- **Temperature** - Battery temperature in °C
+- **SOC** - State of Charge percentage
+- **Voltage** - Battery voltage in volts (2 decimal places)
+- **Current** - Current in amps (2 decimal places, color-coded: Green=charging, Red=discharging, White=idle)
+- **Temperature** - Battery temperature in °C (1 decimal place)
 - Updates via `BATSYS:<voltage>,<current>,<temp>` command
+- All values displayed in consistent font size
 
 ### 3. Status
 - **WiFi Status** - Color-coded (Green=connected, Red=disconnected, White=unknown)
@@ -196,12 +197,13 @@ BRIGHT:<level>\n
 - Updates via `WIFI:<status>` and `DEMO:<state>` commands
 
 ### 4. Charging (Auto-appears)
-- Green charging bolt icon
-- Charging current (+A)
-- Battery voltage (V)
-- Current SOC (%)
+- Charging current in amps (1 decimal place, green)
+- Battery voltage in volts (1 decimal place)
+- Current SOC percentage
+- Battery temperature in °C (1 decimal place)
 - Automatically displayed when `CHARGING:1` received
-- Returns to Battery page after 10s or when charging stops
+- Remains visible while actively charging (no auto-return)
+- Returns to Battery page 10s after charging stops
 
 ### 5. About
 - Application name: "Victron Battery Display System"

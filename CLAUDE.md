@@ -107,25 +107,36 @@ Commands are line-delimited ASCII strings sent from Pico to RP2350:
 - Updated via `BATTERY:<soc>` command
 
 ### 2. System Information
-- **State of Charge (%)** - Large display using 24×32 bitmap font
-- **Voltage (V)** - Battery voltage
-- **Current (A)** - Color-coded:
+- **SOC (%)** - State of Charge percentage (consistent font size)
+- **Voltage (V)** - Battery voltage (2 decimal places)
+- **Current (A)** - Current in amps (2 decimal places, color-coded):
   - Green: Charging (positive current)
   - Red: Discharging (negative current)
   - White: Idle (0A)
-- **Temperature (°C)** - Battery temperature
+- **Temperature (°C)** - Battery temperature (1 decimal place)
 - Updated via `BATSYS:<voltage>,<current>,<temp>` command
 
-### 3. Charging Page (Auto-appears)
-- **Green charging bolt icon**
-- **Charging metrics**:
-  - Current charging rate (+A)
-  - Battery voltage (V)
-  - Current SOC (%)
-- **Auto-display**: Appears when `CHARGING:1` received
-- **Auto-dismiss**: Returns to Battery page after 10s or when charging stops
+### 3. Status Page
+- **WiFi Status** - Connection status (color-coded):
+  - Green: Connected/OK/Active
+  - Red: Disconnected/Failed/Error
+  - White: Unknown
+- **Demo Mode** - Demo mode status (color-coded):
+  - Green: Active/ON/Enabled
+  - White: Inactive/OFF/Disabled/Unknown
+- Updated via `WIFI:<status>` and `DEMO:<state>` commands
 
-### 4. About Page
+### 4. Charging Page (Auto-appears)
+- **Charging metrics**:
+  - Current charging rate in amps (1 decimal place, green)
+  - Battery voltage in volts (1 decimal place)
+  - Current SOC (%)
+  - Battery temperature in °C (1 decimal place)
+- **Auto-display**: Appears when `CHARGING:1` received
+- **Stays visible**: Remains on screen while actively charging (no auto-return)
+- **Auto-dismiss**: Returns to Battery page 10s after charging stops
+
+### 5. About Page
 - **Application name**: "Victron Battery Display System"
 - **Version**: v1.0
 - **Developer**: Paul Williams
