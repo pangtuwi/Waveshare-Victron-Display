@@ -6,9 +6,10 @@ A MicroPython project for the Waveshare RP2350-Touch-LCD-1.28 display that shows
 
 ## Features
 
-### 4-Page Display System
+### 5-Page Display System
 - **Battery Monitor** - Circular gauge showing State of Charge (0-100%) with background image
 - **System Information** - Detailed metrics: SOC, Voltage, Current, Temperature
+- **Status** - WiFi connection and Demo mode status
 - **Charging** - Auto-displays when charging with green charging bolt icon
 - **About** - Application information and credits
 
@@ -150,6 +151,23 @@ CHARGING:<state>\n
 - **Example**: `CHARGING:1\n`
 - **Auto-displays**: Charging page when state changes to 1
 
+**WiFi Status**
+```
+WIFI:<status>\n
+```
+- **status**: WiFi connection status (string)
+- **Example**: `WIFI:Connected\n`
+- **Updates**: Status page
+
+**Demo Mode Status**
+```
+DEMO:<state>\n
+```
+- **state**: Demo mode status (string)
+- **Example**: `DEMO:Active\n`
+- **Sent**: Once at startup
+- **Updates**: Status page
+
 **Brightness Control**
 ```
 BRIGHT:<level>\n
@@ -172,7 +190,12 @@ BRIGHT:<level>\n
 - **Temperature** - Battery temperature in °C
 - Updates via `BATSYS:<voltage>,<current>,<temp>` command
 
-### 3. Charging (Auto-appears)
+### 3. Status
+- **WiFi Status** - Color-coded (Green=connected, Red=disconnected, White=unknown)
+- **Demo Mode** - Color-coded (Green=active, White=inactive/unknown)
+- Updates via `WIFI:<status>` and `DEMO:<state>` commands
+
+### 4. Charging (Auto-appears)
 - Green charging bolt icon
 - Charging current (+A)
 - Battery voltage (V)
@@ -180,14 +203,14 @@ BRIGHT:<level>\n
 - Automatically displayed when `CHARGING:1` received
 - Returns to Battery page after 10s or when charging stops
 
-### 4. About
+### 5. About
 - Application name: "Victron Battery Display System"
 - Version: v1.0
 - Developer: Paul Williams
 
 ## Page Navigation
 
-- **Touch anywhere on screen** → Next page (Battery → System Info → About → Battery → ...)
+- **Touch anywhere on screen** → Next page (Battery → System Info → Status → About → Battery → ...)
 - **10 seconds idle** → Auto-return to Battery page
 - **Charging detected** → Auto-show Charging page
 - **500ms debounce** → Prevents accidental double-touches
@@ -244,6 +267,12 @@ uart.write(b'BATSYS:48.5,12.3,25.5\n')
 
 # Test charging state
 uart.write(b'CHARGING:1\n')
+
+# Test WiFi status
+uart.write(b'WIFI:Connected\n')
+
+# Test demo mode
+uart.write(b'DEMO:Active\n')
 
 # Test brightness
 uart.write(b'BRIGHT:50\n')

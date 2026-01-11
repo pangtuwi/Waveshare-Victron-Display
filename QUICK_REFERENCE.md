@@ -6,6 +6,7 @@
 |------|-------|--------|
 | **Battery** | Circular gauge (SOC) | Default, auto-return after 10s |
 | **System Info** | SOC, Voltage, Current, Temp | Touch screen to cycle |
+| **Status** | WiFi status, Demo mode | Touch screen to cycle |
 | **Charging** | Charging metrics + bolt icon | Auto-appears when charging |
 | **About** | App name, Paul Williams | Touch screen to cycle |
 
@@ -26,6 +27,12 @@ uart.write(b"BATSYS:48.5,12.3,25.5\n")
 
 # Charging state (0=no, 1=yes)
 uart.write(b"CHARGING:1\n")
+
+# WiFi status
+uart.write(b"WIFI:Connected\n")
+
+# Demo mode status (sent once at startup)
+uart.write(b"DEMO:Active\n")
 
 # Brightness (0-100%)
 uart.write(b"BRIGHT:75\n")
@@ -103,6 +110,8 @@ mpremote
 >>> uart.write(b'BATTERY:75\n')
 >>> uart.write(b'BATSYS:48.5,12.3,25.5\n')
 >>> uart.write(b'CHARGING:1\n')
+>>> uart.write(b'WIFI:Connected\n')
+>>> uart.write(b'DEMO:Active\n')
 ```
 
 ## Files Documentation

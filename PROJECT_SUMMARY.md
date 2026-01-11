@@ -45,7 +45,17 @@ This is a Raspberry Pi Pico-powered battery monitoring display for Victron batte
   - White: Idle (0A)
 - Battery Temperature (°C)
 
-### 3. Charging Page (Auto-appears)
+### 3. Status Page
+**Displayed Data:**
+- WiFi Status - Color-coded:
+  - Green: Connected/OK/Active
+  - Red: Disconnected/Failed/Error
+  - White: Unknown
+- Demo Mode - Color-coded:
+  - Green: Active/ON/Enabled
+  - White: Inactive/OFF/Disabled/Unknown
+
+### 4. Charging Page (Auto-appears)
 - **Green charging bolt icon**
 - **Charging metrics:**
   - Current charging rate (+A)
@@ -54,7 +64,7 @@ This is a Raspberry Pi Pico-powered battery monitoring display for Victron batte
 - **Auto-display**: Appears when Pico sends `CHARGING:1`
 - **Dismissible**: Touch to cycle pages, or auto-return after 10s
 
-### 4. About Page
+### 5. About Page
 - **Application name**: "Victron Battery Display System"
 - **Version**: v1.0
 - **Developer**: Paul Williams
@@ -66,7 +76,7 @@ This is a Raspberry Pi Pico-powered battery monitoring display for Victron batte
 ### Touch Controls
 - **Touch anywhere on screen**: Cycle through pages
   ```
-  Battery → System Info → About → Battery → ...
+  Battery → System Info → Status → About → Battery → ...
   ```
 - **Charging page**: Only appears when charging active
 - **Auto-return timeout**: 10 seconds back to Battery page
@@ -103,6 +113,23 @@ CHARGING:<state>\n
 ```
 - **state**: 0=not charging, 1=charging
 - **Example**: `CHARGING:1\n`
+
+#### WiFi Status
+```
+WIFI:<status>\n
+```
+- **status**: WiFi connection status (string)
+- **Example**: `WIFI:Connected\n`
+- **Updates**: Status page
+
+#### Demo Mode Status
+```
+DEMO:<state>\n
+```
+- **state**: Demo mode status (string)
+- **Example**: `DEMO:Active\n`
+- **Sent**: Once at startup
+- **Updates**: Status page
 
 #### Brightness Control
 ```

@@ -49,6 +49,10 @@ battery_current = 0.0  # Current in A (positive=charging, negative=discharging)
 battery_temp = 0.0  # Temperature in °C
 is_charging = False  # Charging state
 
+# System status data
+wifi_status = "Unknown"  # WiFi connection status
+demo_mode = "Unknown"  # Demo mode status
+
 # Page navigation settings
 AUTO_RETURN_TIMEOUT_MS = 10000  # 10 seconds to auto-return to Battery page
 last_page_change_time = time.ticks_ms()
@@ -57,6 +61,7 @@ def process_command(cmd_line):
     """Process incoming commands from Raspberry Pi Pico via UART"""
     global current_brightness, current_mode, display_color
     global battery_soc, battery_voltage, battery_current, battery_temp, is_charging
+    global wifi_status, demo_mode
     global battery_monitor, last_page_change_time
 
     try:
@@ -163,6 +168,26 @@ def process_command(cmd_line):
             except ValueError:
                 print(f"Invalid charging state format: {state_str}")
 
+        elif cmd_line.startswith(b'WIFI:'):
+            # Update WiFi status
+            # Format: WIFI:status
+            status_str = cmd_line[5:].decode().strip()
+            wifi_status = status_str
+            print(f"WiFi status: {wifi_status}")
+            # Refresh display if on Status page
+            if current_mode == "Status":
+                update_display_for_mode(current_mode)
+
+        elif cmd_line.startswith(b'DEMO:'):
+            # Update demo mode status
+            # Format: DEMO:state
+            state_str = cmd_line[5:].decode().strip()
+            demo_mode = state_str
+            print(f"Demo mode: {demo_mode}")
+            # Refresh display if on Status page
+            if current_mode == "Status":
+                update_display_for_mode(current_mode)
+
     except Exception as e:
         print(f"Error processing command: {e}")
 
@@ -170,9 +195,9 @@ def cycle_mode():
     """Cycle to the next display page"""
     global current_mode, last_page_change_time
 
-    # Normal page cycling: Battery → SystemInfo → About → Battery
+    # Normal page cycling: Battery → SystemInfo → Status → About → Battery
     # (Charging page is only shown when charging is active)
-    modes = ["Battery", "SystemInfo", "About"]
+    modes = ["Battery", "SystemInfo", "Status", "About"]
 
     try:
         current_index = modes.index(current_mode)
@@ -268,6 +293,36 @@ def update_display_for_mode(mode):
         lcd.text("SOC:", 20, 200, lcd.white)
         soc_text = f"{battery_soc}%"
         lcd.write_text(soc_text, 130, 197, 2, lcd.white)
+
+    elif mode == "Status":
+        # Status page - system status information
+        # Title
+        lcd.text("SYSTEM STATUS", 65, 20, lcd.white)
+
+        # Draw horizontal line separator
+        lcd.hline(10, 40, 220, lcd.white)
+
+        # WiFi Status
+        lcd.text("WiFi Status:", 20, 70, lcd.white)
+        # Color-code WiFi status
+        if "Connected" in wifi_status or "OK" in wifi_status or "Active" in wifi_status:
+            wifi_color = 0x07E0  # Green for connected
+        elif "Disconnected" in wifi_status or "Failed" in wifi_status or "Error" in wifi_status:
+            wifi_color = 0xF800  # Red for disconnected
+        else:
+            wifi_color = lcd.white  # White for unknown
+        lcd.write_text(wifi_status, 20, 87, 2, wifi_color)
+
+        # Demo Mode Status
+        lcd.text("Demo Mode:", 20, 140, lcd.white)
+        # Color-code demo mode
+        if "Active" in demo_mode or "ON" in demo_mode or "Enabled" in demo_mode:
+            demo_color = 0x07E0  # Green for active
+        elif "Inactive" in demo_mode or "OFF" in demo_mode or "Disabled" in demo_mode:
+            demo_color = lcd.white  # White for inactive
+        else:
+            demo_color = lcd.white  # White for unknown
+        lcd.write_text(demo_mode, 20, 157, 2, demo_color)
 
     elif mode == "About":
         # About page - application and author information
