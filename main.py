@@ -56,13 +56,15 @@ demo_mode = "Unknown"  # Demo mode status
 # Page navigation settings
 AUTO_RETURN_TIMEOUT_MS = 10000  # 10 seconds to auto-return to Battery page
 last_page_change_time = time.ticks_ms()
+MODE_CHANGE_COOLDOWN_MS = 1000  # Prevent rapid mode switching (1 second cooldown)
+last_mode_change_time = 0
 
 def process_command(cmd_line):
     """Process incoming commands from Raspberry Pi Pico via UART"""
     global current_brightness, current_mode, display_color
     global battery_soc, battery_voltage, battery_current, battery_temp, is_charging
     global wifi_status, demo_mode
-    global battery_monitor, last_page_change_time
+    global battery_monitor, last_page_change_time, last_mode_change_time
 
     try:
         print(f"Received command: {cmd_line}")
@@ -77,10 +79,21 @@ def process_command(cmd_line):
         elif cmd_line.startswith(b'MODE:'):
             # Change display mode (for compatibility)
             mode = cmd_line[5:].decode().strip()
-            current_mode = mode
-            print(f"Mode changed to: {mode}")
-            update_display_for_mode(mode)
-            last_page_change_time = time.ticks_ms()
+
+            # Check cooldown to prevent rapid mode switching
+            current_time = time.ticks_ms()
+            if time.ticks_diff(current_time, last_mode_change_time) < MODE_CHANGE_COOLDOWN_MS:
+                print(f"Mode change ignored (cooldown active): {mode}")
+                return
+
+            if mode != current_mode:
+                print(f"Mode changed via UART: {current_mode} → {mode}")
+                current_mode = mode
+                update_display_for_mode(mode)
+                last_page_change_time = time.ticks_ms()
+                last_mode_change_time = time.ticks_ms()
+            else:
+                print(f"Mode unchanged: {mode}")
 
         elif cmd_line.startswith(b'CMD:CLEAR'):
             # Clear display
@@ -150,18 +163,16 @@ def process_command(cmd_line):
 
                 # Auto-switch to Charging page when charging starts
                 if is_charging and not was_charging:
-                    print("Charging started - switching to Charging page")
+                    print("Charging started - auto-switching to Charging page")
                     current_mode = "Charging"
                     update_display_for_mode(current_mode)
                     last_page_change_time = time.ticks_ms()
-                # Return to Battery page when charging stops (after timeout)
+                    last_mode_change_time = time.ticks_ms()
+                # Log when charging stops (but don't reset timer - let auto-return handle it)
                 elif not is_charging and was_charging:
-                    print("Charging stopped")
-                    if current_mode == "Charging":
-                        # Stay on Charging page but allow timeout to return to Battery
-                        last_page_change_time = time.ticks_ms()
+                    print("Charging stopped - page will auto-return to Battery in 10s")
 
-                # Refresh display if on Charging page
+                # Refresh display if on Charging page (without resetting timer)
                 if current_mode == "Charging":
                     update_display_for_mode(current_mode)
 
@@ -193,12 +204,13 @@ def process_command(cmd_line):
 
 def cycle_mode():
     """Cycle to the next display page"""
-    global current_mode, last_page_change_time
+    global current_mode, last_page_change_time, last_mode_change_time
 
     # Normal page cycling: Battery → SystemInfo → Status → About → Battery
     # (Charging page is only shown when charging is active)
     modes = ["Battery", "SystemInfo", "Status", "About"]
 
+    old_mode = current_mode
     try:
         current_index = modes.index(current_mode)
         next_index = (current_index + 1) % len(modes)
@@ -207,9 +219,10 @@ def cycle_mode():
         # If current mode is not in list (e.g., Charging), go to Battery
         current_mode = "Battery"
 
-    print(f"Page changed to: {current_mode}")
+    print(f"Page changed via touch: {old_mode} → {current_mode}")
     update_display_for_mode(current_mode)
     last_page_change_time = time.ticks_ms()
+    last_mode_change_time = time.ticks_ms()
 
 def update_display_for_mode(mode):
     """Update display based on selected page"""
@@ -344,7 +357,7 @@ def update_display_for_mode(mode):
 
 def check_auto_return_to_battery():
     """Check if we should auto-return to Battery page after timeout"""
-    global current_mode, last_page_change_time
+    global current_mode, last_page_change_time, last_mode_change_time
 
     # Don't auto-return if already on Battery page
     if current_mode == "Battery":
@@ -353,10 +366,13 @@ def check_auto_return_to_battery():
     # Check if timeout has elapsed
     elapsed = time.ticks_diff(time.ticks_ms(), last_page_change_time)
     if elapsed > AUTO_RETURN_TIMEOUT_MS:
-        print(f"Auto-returning to Battery page after {elapsed}ms")
+        old_mode = current_mode
+        print(f"Auto-return triggered: {old_mode} → Battery (after {elapsed}ms)")
         current_mode = "Battery"
         update_display_for_mode(current_mode)
         last_page_change_time = time.ticks_ms()
+        last_mode_change_time = time.ticks_ms()
+        print(f"Auto-return complete, timer reset")
 
 # Display initial Battery page after welcome message
 update_display_for_mode(current_mode)
