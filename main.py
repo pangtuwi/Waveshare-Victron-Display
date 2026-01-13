@@ -50,8 +50,8 @@ battery_temp = 0.0  # Temperature in °C
 is_charging = False  # Charging state
 
 # System status data
-wifi_status = "Unknown"  # WiFi connection status
-demo_mode = "Unknown"  # Demo mode status
+wifi_status = -1  # WiFi connection status: -1=Unknown, 0=Disconnected, 1=Connected, 2=Skipped (demo mode)
+demo_mode = 0  # Demo mode status: 0=Inactive, 1=Active
 
 # Page navigation settings
 AUTO_RETURN_TIMEOUT_MS = 10000  # 10 seconds to auto-return to Battery page
@@ -183,20 +183,28 @@ def process_command(cmd_line):
 
         elif cmd_line.startswith(b'WIFI:'):
             # Update WiFi status
-            # Format: WIFI:status
+            # Format: WIFI:status (0=Disconnected, 1=Connected, 2=Skipped/Demo)
             status_str = cmd_line[5:].decode().strip()
-            wifi_status = status_str
-            print(f"WiFi status: {wifi_status}")
+            try:
+                wifi_status = int(status_str)
+                status_text = ["Disconnected", "Connected", "Skipped"][wifi_status] if 0 <= wifi_status <= 2 else "Unknown"
+                print(f"WiFi status: {wifi_status} ({status_text})")
+            except (ValueError, IndexError):
+                print(f"Invalid WiFi status format: {status_str}")
             # Refresh display if on Status page
             if current_mode == "Status":
                 update_display_for_mode(current_mode)
 
         elif cmd_line.startswith(b'DEMO:'):
             # Update demo mode status
-            # Format: DEMO:state
+            # Format: DEMO:state (0=Inactive, 1=Active)
             state_str = cmd_line[5:].decode().strip()
-            demo_mode = state_str
-            print(f"Demo mode: {demo_mode}")
+            try:
+                demo_mode = int(state_str)
+                mode_text = "Active" if demo_mode == 1 else "Inactive"
+                print(f"Demo mode: {demo_mode} ({mode_text})")
+            except ValueError:
+                print(f"Invalid demo mode format: {state_str}")
             # Refresh display if on Status page
             if current_mode == "Status":
                 update_display_for_mode(current_mode)
@@ -238,71 +246,71 @@ def update_display_for_mode(mode):
     elif mode == "SystemInfo":
         # System Information page - detailed battery metrics
         # Title
-        lcd.text("SYSTEM INFO", 70, 20, lcd.white)
+        lcd.text("SYSTEM INFO", 70, 15, lcd.white)
 
         # Draw horizontal line separator
-        lcd.hline(10, 40, 220, lcd.white)
+        lcd.hline(10, 35, 220, lcd.white)
 
         # SOC
-        lcd.text("SOC:", 20, 70, lcd.white)
+        lcd.text("SOC:", 20, 60, lcd.white)
         soc_text = f"{battery_soc}%"
-        lcd.write_text(soc_text, 140, 67, 2, lcd.white)
+        lcd.write_text(soc_text, 140, 57, 2, lcd.white)
 
         # Voltage
-        lcd.text("Voltage:", 20, 110, lcd.white)
-        voltage_text = f"{battery_voltage:.2f}V"
-        lcd.write_text(voltage_text, 140, 107, 2, lcd.white)
+        lcd.text("Voltage:", 20, 95, lcd.white)
+        voltage_text = f"{battery_voltage:.1f}V"
+        lcd.write_text(voltage_text, 140, 92, 2, lcd.white)
 
         # Current
-        lcd.text("Current:", 20, 150, lcd.white)
+        lcd.text("Current:", 20, 130, lcd.white)
         # Show charging/discharging indicator
         if battery_current > 0:
             current_color = 0x07E0  # Green (charging)
-            current_text = f"+{battery_current:.2f}A"
+            current_text = f"+{battery_current:.1f}A"
         elif battery_current < 0:
             current_color = 0xF800  # Red (discharging)
-            current_text = f"{battery_current:.2f}A"
+            current_text = f"{battery_current:.1f}A"
         else:
             current_color = lcd.white
-            current_text = "0.00A"
-        lcd.write_text(current_text, 140, 147, 2, current_color)
+            current_text = "0.0A"
+        lcd.write_text(current_text, 140, 127, 2, current_color)
 
         # Temperature
-        lcd.text("Temperature:", 20, 190, lcd.white)
+        lcd.text("Temperature:", 20, 165, lcd.white)
         temp_text = f"{battery_temp:.1f}"
-        lcd.write_text(temp_text, 140, 187, 2, lcd.white)
-        lcd.text("o", 200, 188, lcd.white)
-        lcd.text("C", 208, 193, lcd.white)
+        lcd.write_text(temp_text, 140, 162, 2, lcd.white)
+        lcd.text("o", 200, 163, lcd.white)
+        lcd.text("C", 208, 168, lcd.white)
 
     elif mode == "Charging":
         # Charging page - displayed when battery is charging
         # Title
-        lcd.text("CHARGING", 80, 30, lcd.white)
+        lcd.text("CHARGING", 80, 20, lcd.white)
 
         # Draw horizontal line separator
-        lcd.hline(10, 50, 220, lcd.white)
+        lcd.hline(10, 40, 220, lcd.white)
 
         # Charging metrics
-        lcd.text("Current:", 20, 90, lcd.white)
+        lcd.text("Current:", 20, 70, lcd.white)
         if battery_current > 0:
             charge_text = f"+{battery_current:.1f}A"
         else:
             charge_text = "0.0A"
-        lcd.write_text(charge_text, 130, 87, 2, 0x07E0)  # Green
+        lcd.write_text(charge_text, 130, 67, 2, 0x07E0)  # Green
 
-        lcd.text("Voltage:", 20, 130, lcd.white)
+        lcd.text("Voltage:", 20, 105, lcd.white)
         voltage_text = f"{battery_voltage:.1f}V"
-        lcd.write_text(voltage_text, 130, 127, 2, lcd.white)
+        lcd.write_text(voltage_text, 130, 102, 2, lcd.white)
 
-        lcd.text("SOC:", 20, 170, lcd.white)
+        lcd.text("SOC:", 20, 140, lcd.white)
         soc_text = f"{battery_soc}%"
-        lcd.write_text(soc_text, 130, 167, 2, lcd.white)
+        lcd.write_text(soc_text, 130, 137, 2, lcd.white)
 
-        lcd.text("Temperature:", 20, 210, lcd.white)
+        lcd.text("Temperature:", 20, 175, lcd.white)
         temp_text = f"{battery_temp:.1f}"
-        lcd.write_text(temp_text, 130, 207, 2, lcd.white)
-        lcd.text("o", 190, 208, lcd.white)
-        lcd.text("C", 198, 213, lcd.white)
+        lcd.write_text(temp_text, 130, 172, 2, lcd.white)
+        lcd.text("o", 190, 173, lcd.white)
+        lcd.text("C", 198, 178, lcd.white)
 
     elif mode == "Status":
         # Status page - system status information
@@ -314,25 +322,24 @@ def update_display_for_mode(mode):
 
         # WiFi Status
         lcd.text("WiFi Status:", 20, 70, lcd.white)
-        # Color-code WiFi status
-        if "Connected" in wifi_status or "OK" in wifi_status or "Active" in wifi_status:
-            wifi_color = 0x07E0  # Green for connected
-        elif "Disconnected" in wifi_status or "Failed" in wifi_status or "Error" in wifi_status:
-            wifi_color = 0xF800  # Red for disconnected
+        # Display WiFi status based on numeric value
+        if wifi_status == 1:
+            wifi_text = "Connected"
+            wifi_color = 0x07E0  # Green
+        elif wifi_status == 0:
+            wifi_text = "Disconnected"
+            wifi_color = 0xF800  # Red
+        elif wifi_status == 2:
+            wifi_text = "Skipped"
+            wifi_color = lcd.white  # White
         else:
-            wifi_color = lcd.white  # White for unknown
-        lcd.write_text(wifi_status, 20, 87, 2, wifi_color)
+            wifi_text = "Unknown"
+            wifi_color = lcd.white  # White
+        lcd.write_text(wifi_text, 20, 87, 2, wifi_color)
 
-        # Demo Mode Status
-        lcd.text("Demo Mode:", 20, 140, lcd.white)
-        # Color-code demo mode
-        if "Active" in demo_mode or "ON" in demo_mode or "Enabled" in demo_mode:
-            demo_color = 0x07E0  # Green for active
-        elif "Inactive" in demo_mode or "OFF" in demo_mode or "Disabled" in demo_mode:
-            demo_color = lcd.white  # White for inactive
-        else:
-            demo_color = lcd.white  # White for unknown
-        lcd.write_text(demo_mode, 20, 157, 2, demo_color)
+        # Demo Mode - only display if active
+        if demo_mode == 1:
+            lcd.write_text("Demo Mode", 20, 140, 2, 0x07E0)  # Green
 
     elif mode == "About":
         # About page - application and author information
